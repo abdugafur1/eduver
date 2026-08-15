@@ -3,160 +3,94 @@
 namespace App\Console\Commands;
 
 use App\Models\StudySet;
+use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
 /**
- * All 1,414 study_sets landed on the `private` DEFAULT because the import's
- * INSERT never named the visibility column. This re-derives it.
+ * Sets visibility on every study set deliberately, rather than leaving whatever
+ * the import happened to write.
  *
- * Whatever you run here becomes the production cutover migration, so it is
- * dry-run by default and prints a full breakdown before changing anything.
+ * The rule is deny-by-default: everything goes private, then a named allow-list
+ * comes back out. That way an author who never agreed to have their work
+ * republished stays private even if this command is re-run after new rows land,
+ * and a bug in the allow-list under-publishes rather than over-publishes.
  *
- *   # Scenario A — legacy had a privacy flag, joined on legacy_slug
- *   php artisan sets:backfill-visibility \
- *       --connection=legacy --table=sets --key=slug --column=is_public
- *
- *   # Scenario B — legacy had no privacy concept; everything was public
- *   php artisan sets:backfill-visibility --all-public
- *
- * Add --apply once the dry run reads correctly.
+ * Dry-run by default. Nothing is written without --force.
  */
 class BackfillSetVisibility extends Command
 {
     protected $signature = 'sets:backfill-visibility
-        {--connection= : Legacy DB connection name from config/database.php}
-        {--table= : Legacy table holding the sets}
-        {--key=slug : Legacy column to match against study_sets.legacy_slug}
-        {--column= : Legacy column holding the privacy flag}
-        {--all-public : Mark every set public; use only if legacy had no privacy flag}
-        {--apply : Actually write. Without this, nothing is changed}';
+        {--owner=eduver : Official account; its sets are always published}
+        {--publish=* : Additional usernames whose sets should go public (repeatable)}
+        {--min-cards=1 : Sets with fewer cards than this stay private}
+        {--force : Actually write. Without it the command only reports.}';
 
-    protected $description = 'Re-derive study_sets.visibility from the legacy source';
+    protected $description = 'Set every study set private, then publish the official account and any vouched-for authors';
 
     public function handle(): int
     {
-        $apply = (bool) $this->option('apply');
+        $force = (bool) $this->option('force');
+        $minCards = (int) $this->option('min-cards');
 
-        if (! $apply) {
-            $this->warn('DRY RUN — no rows will be written. Re-run with --apply to commit.');
-            $this->newLine();
+        $usernames = array_values(array_unique(array_merge(
+            [$this->option('owner')],
+            $this->option('publish')
+        )));
+
+        $publishers = User::whereIn('username', $usernames)->get(['id', 'username']);
+
+        if ($missing = array_diff($usernames, $publishers->pluck('username')->all())) {
+            $this->error('Unknown username(s): '.implode(', ', $missing));
+
+            return self::FAILURE;
         }
 
-        return $this->option('all-public')
-            ? $this->allPublic($apply)
-            : $this->fromLegacy($apply);
-    }
+        $publisherIds = $publishers->pluck('id')->all();
 
-    private function allPublic(bool $apply): int
-    {
         $total = StudySet::count();
 
-        $this->line("Would set <info>{$total}</info> sets to ".StudySet::VISIBILITY_PUBLIC.'.');
-        $this->newLine();
-        $this->warn('This publishes every set in the database. Only correct if the legacy');
-        $this->warn('site genuinely had no privacy flag. If it did, and you run this, you');
-        $this->warn('publish content users chose to keep private — and this same command');
-        $this->warn('is what you will point at real data during cutover.');
+        $publicQuery = fn () => StudySet::whereIn('user_id', $publisherIds)
+            ->where('cards_count', '>=', $minCards);
 
-        if (! $apply) {
-            return self::SUCCESS;
-        }
+        $willPublish = $publicQuery()->count();
 
-        if (! $this->confirm('Confirmed the legacy schema has no privacy column?', false)) {
-            $this->info('Aborted. Nothing changed.');
-
-            return self::SUCCESS;
-        }
-
-        StudySet::query()->update(['visibility' => StudySet::VISIBILITY_PUBLIC]);
-        $this->info("Updated {$total} sets.");
-
-        return self::SUCCESS;
-    }
-
-    private function fromLegacy(bool $apply): int
-    {
-        foreach (['connection', 'table', 'column'] as $required) {
-            if (blank($this->option($required))) {
-                $this->error("--{$required} is required unless you pass --all-public.");
-
-                return self::FAILURE;
-            }
-        }
-
-        $key = $this->option('key');
-        $column = $this->option('column');
-
-        $legacy = DB::connection($this->option('connection'))
-            ->table($this->option('table'))
-            ->pluck($column, $key);
-
-        $this->line("Read <info>{$legacy->count()}</info> rows from the legacy table.");
-
-        $counts = ['public' => 0, 'private' => 0, 'unmatched' => 0, 'no_legacy_slug' => 0];
-        $updates = [];
-
-        StudySet::query()
-            ->select(['id', 'slug', 'legacy_slug'])
-            ->chunkById(500, function ($sets) use ($legacy, &$counts, &$updates) {
-                foreach ($sets as $set) {
-                    if (blank($set->legacy_slug)) {
-                        $counts['no_legacy_slug']++;
-
-                        continue;
-                    }
-
-                    if (! $legacy->has($set->legacy_slug)) {
-                        $counts['unmatched']++;
-
-                        continue;
-                    }
-
-                    // Treats 1/'1'/'yes'/'public' as public, everything else as
-                    // private. Verify against the real values before applying.
-                    $raw = $legacy->get($set->legacy_slug);
-                    $isPublic = in_array(
-                        is_string($raw) ? strtolower(trim($raw)) : $raw,
-                        [1, true, '1', 'y', 'yes', 'true', 'public', 'everyone'],
-                        false
-                    );
-
-                    $visibility = $isPublic
-                        ? StudySet::VISIBILITY_PUBLIC
-                        : StudySet::VISIBILITY_PRIVATE;
-
-                    $counts[$visibility]++;
-                    $updates[$visibility][] = $set->id;
-                }
-            });
+        $heldBack = StudySet::whereIn('user_id', $publisherIds)
+            ->where('cards_count', '<', $minCards)
+            ->count();
 
         $this->newLine();
-        $this->table(['Outcome', 'Sets'], [
-            ['→ public', $counts['public']],
-            ['→ private', $counts['private']],
-            ['no match in legacy table', $counts['unmatched']],
-            ['legacy_slug is null', $counts['no_legacy_slug']],
+        $this->table(['', 'sets'], [
+            ['total', $total],
+            ['going public', $willPublish],
+            ['staying private', $total - $willPublish],
+            ["empty (under {$minCards} cards, held back)", $heldBack],
         ]);
 
-        if ($counts['unmatched'] + $counts['no_legacy_slug'] > 0) {
-            $this->newLine();
-            $this->warn('Unmatched sets keep their current value (private). Investigate');
-            $this->warn('those before cutover — silently defaulting is what caused this.');
-        }
+        $this->newLine();
+        $this->table(['publishing as', 'sets'], $publishers->map(fn (User $u) => [
+            $u->username,
+            StudySet::where('user_id', $u->id)->where('cards_count', '>=', $minCards)->count(),
+        ])->all());
 
-        if (! $apply) {
+        if (! $force) {
+            $this->newLine();
+            $this->comment('Dry run. Re-run with --force to apply.');
+
             return self::SUCCESS;
         }
 
-        foreach ($updates as $visibility => $ids) {
-            foreach (array_chunk($ids, 1000) as $chunk) {
-                StudySet::whereIn('id', $chunk)->update(['visibility' => $visibility]);
-            }
-        }
+        DB::transaction(function () use ($publicQuery) {
+            // Order matters: the blanket private write first, so a set that was
+            // public under an old rule and no longer qualifies actually flips back.
+            StudySet::query()->update(['visibility' => 'private']);
+
+            $publicQuery()->update(['visibility' => 'public']);
+        });
 
         $this->newLine();
-        $this->info('Backfill applied.');
+        $this->info("Done. {$willPublish} public, ".($total - $willPublish).' private.');
+        $this->comment('Check /sets as a guest — that page should now show exactly the public set.');
 
         return self::SUCCESS;
     }
