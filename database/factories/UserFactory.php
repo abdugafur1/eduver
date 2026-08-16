@@ -26,6 +26,7 @@ class UserFactory extends Factory
     {
         return [
             'name' => fake()->name(),
+            'username' => Str::slug(fake()->unique()->userName(), '_'),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
@@ -41,5 +42,15 @@ class UserFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
         ]);
+    }
+
+    public function legacy(): static
+    {
+        return $this->state(fn () => [
+            'legacy_id' => fake()->unique()->numberBetween(1, 9999),
+            'must_reset_password' => true,
+        ])->afterMaking(fn (User $user) => $user->setRawAttributes(
+            array_merge($user->getAttributes(), ['password' => '!legacy-import-no-login!'])
+        ));
     }
 }

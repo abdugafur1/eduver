@@ -8,7 +8,6 @@ use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
 use Illuminate\View\View;
 
@@ -45,7 +44,8 @@ class RegisteredUserController extends Controller
                 'string',
                 'min:3',
                 'max:30',
-                'alpha_dash',
+                'alpha_dash:ascii',
+                'not_in:admin,administrator,root,support,help,api,eduver,official,staff,moderator',
                 'unique:'.User::class.',username',
             ],
 
@@ -65,7 +65,7 @@ class RegisteredUserController extends Controller
             'name' => $validated['name'],
             'username' => $validated['username'],
             'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
+            'password' => $validated['password'],
         ]);
 
         event(new Registered($user));

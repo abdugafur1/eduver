@@ -66,6 +66,12 @@ class LoginRequest extends FormRequest
         $credentials = [
             $this->identifierField() => $this->input('login'),
             'password' => $this->input('password'),
+
+            // Imported rows are authorship records, not accounts. Their password
+            // column holds the string '!legacy', which Hash::check() can never
+            // match — but that's an accident of the import script rather than a
+            // guarantee, so the lookup excludes them structurally as well.
+            'legacy_id' => null,
         ];
 
         if (! Auth::attempt($credentials, $this->boolean('remember'))) {
