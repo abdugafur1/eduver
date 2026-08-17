@@ -2,18 +2,18 @@
 
 namespace Tests\Feature;
 
-// use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class ExampleTest extends TestCase
 {
     /**
-     * A basic test example.
+     * There is no homepage. Route::redirect('/', '/sets') sends the root
+     * straight to the browser, so the stock "returns 200" assertion this
+     * replaces had been failing since that line was added.
      */
-    public function test_the_application_returns_a_successful_response(): void
+    public function test_the_root_redirects_to_the_set_browser(): void
     {
-        $response = $this->get('/');
-
-        $response->assertStatus(200);
+        $this->get('/')
+            ->assertRedirect(route('sets.index'));
     }
 }
