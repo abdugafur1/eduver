@@ -241,11 +241,20 @@
         .wealth {
             position: fixed;
             bottom: 10px;
-            left: 14%;
+            /* Clears .chrome, which is pinned at left: 0 with a ~52px icon and
+               15px of padding. The live site's left: 14% was doing the same job
+               against its own bottom bar; this states the reason instead of
+               inheriting a percentage that only worked at one viewport. */
+            left: 96px;
             z-index: 20;
-            width: 250px;
             display: flex;
-            justify-content: space-between;
+            /* Sized by its contents, not fixed at 250px. With credits hidden
+               the old width left ~125px of invisible fixed box over the
+               bottom-left of the page, swallowing clicks on the tile beneath.
+               gap spaces one pill or two identically, so restoring credits
+               needs no layout change. */
+            width: auto;
+            gap: 12px;
         }
 
         /* Flat fills, not gradients — the live pills are solid, and they swap
@@ -612,8 +621,14 @@
         <div class="chrome">@yield('current-icon')</div>
     @endif
 
+    {{-- Default rather than opt-in. Per-view @section('wealth') still wins, but
+         a page that forgets it gets the pills instead of silently losing them. --}}
     @hasSection('wealth')
         <div class="wealth">@yield('wealth')</div>
+    @else
+        @auth
+            <div class="wealth">@include('partials.wealth')</div>
+        @endauth
     @endif
 </body>
 </html>
