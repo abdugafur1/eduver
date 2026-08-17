@@ -93,9 +93,46 @@ class QuizQuestion extends Model
         return $query->whereNull('answered_at')->where('expires_at', '<=', now());
     }
 
+    /**
+     * True/false rows store a different shape in presented_options:
+     * ['claim' => string, 'options' => ['True', 'False']]. Multiple choice
+     * stores a plain list of option strings.
+     *
+     * The migration sanctions this — presented_options is described as the
+     * distractors *and prompt* actually rendered, so a session can be replayed.
+     * A true/false question's prompt is the claim, and without storing it the
+     * result page could not show what was actually asked.
+     */
+    public function isTrueFalse(): bool
+    {
+        return is_array($this->presented_options)
+            && array_key_exists('claim', $this->presented_options);
+    }
+
+    /**
+     * Note: this used to be `filled($presented_options)`, which was correct
+     * when multiple choice was the only mode that populated the column.
+     * True/false populates it too, so the check now has to exclude that shape.
+     */
     public function isMultipleChoice(): bool
     {
-        return filled($this->presented_options);
+        return filled($this->presented_options) && ! $this->isTrueFalse();
+    }
+
+    /** The answerable options, whichever shape the row is in. */
+    public function options(): array
+    {
+        if ($this->isTrueFalse()) {
+            return $this->presented_options['options'] ?? [];
+        }
+
+        return $this->presented_options ?? [];
+    }
+
+    /** What a true/false question actually asserted. Null for other modes. */
+    public function claim(): ?string
+    {
+        return $this->isTrueFalse() ? ($this->presented_options['claim'] ?? null) : null;
     }
 
     public function hasExpired(): bool

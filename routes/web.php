@@ -1,18 +1,55 @@
 <?php
 
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\QuizController;
 use App\Http\Controllers\StudySetController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/sets');
 
 Route::get('/sets', [StudySetController::class, 'index'])->name('sets.index');
-Route::get('/sets/{studySet}', [StudySetController::class, 'show'])->name('sets.show');
+
+/*
+ | sets.show is flashcards, not the card table. Two reasons it's the canonical
+ | view rather than a mode picker:
+ |
+ |   - quiz_sessions.user_id is constrained() and not nullable, so multiple
+ |     choice, written and true/false all require an account. A picker would
+ |     land guests on four buttons, three of which they can't press.
+ |   - flashcards writes nothing — no session, no counters, no last_studied_at
+ |     — so it's safe to serve to anyone who can read the set.
+ |
+ | Every existing route('sets.show', $set) in the browse tiles keeps working;
+ | the old table now lives at sets.terms. The more specific URIs are declared
+ | first so they aren't swallowed by the /sets/{studySet} wildcard.
+ */
+Route::get('/sets/{studySet}/terms', [StudySetController::class, 'terms'])->name('sets.terms');
 
 Route::middleware(['auth', 'password.usable'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    /*
+     | Starting a quiz is keyed by set; playing one is keyed by session. They're
+     | separate resources because a session outlives the page that opened it —
+     | you can leave and come back, and start() will resume rather than reissue.
+     |
+     | The mode-strip partial does Route::has('sets.quiz.{mode}'), so adding
+     | true/false later is a route here plus a case in the controller. The
+     | strip lights up on its own.
+     */
+    Route::get('/sets/{studySet}/quiz/multiple-choice', [QuizController::class, 'startMultipleChoice'])
+        ->name('sets.quiz.multiple_choice');
+
+    Route::get('/sets/{studySet}/quiz/true-false', [QuizController::class, 'startTrueFalse'])
+        ->name('sets.quiz.true_false');
+
+    Route::get('/quiz/{quizSession}', [QuizController::class, 'play'])->name('quiz.play');
+    Route::post('/quiz/{quizSession}', [QuizController::class, 'answer'])->name('quiz.answer');
+    Route::get('/quiz/{quizSession}/result', [QuizController::class, 'result'])->name('quiz.result');
 });
+
+Route::get('/sets/{studySet}', [StudySetController::class, 'show'])->name('sets.show');
 
 require __DIR__.'/auth.php';

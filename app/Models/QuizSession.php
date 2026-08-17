@@ -21,6 +21,14 @@ class QuizSession extends Model
      */
     public const MODE_MULTIPLE_CHOICE = 'multiple_choice';
 
+    public const MODE_TRUE_FALSE = 'true_false';
+
+    /** Mode key => label. A new mode is a row here plus a route. */
+    public const MODES = [
+        self::MODE_MULTIPLE_CHOICE => 'Multiple choice',
+        self::MODE_TRUE_FALSE => 'True and false',
+    ];
+
     protected $fillable = [
         'user_id',
         'study_set_id',
@@ -51,6 +59,16 @@ class QuizSession extends Model
             'started_at' => 'datetime',
             'completed_at' => 'datetime',
         ];
+    }
+
+    public function modeLabel(): string
+    {
+        return self::MODES[$this->mode] ?? $this->mode;
+    }
+
+    public function isTrueFalse(): bool
+    {
+        return $this->mode === self::MODE_TRUE_FALSE;
     }
 
     public function user(): BelongsTo
