@@ -108,24 +108,6 @@
         margin-left: auto;
     }
 
-    .sort {
-        font-family: var(--mono);
-        font-size: 12px;
-        letter-spacing: 0.02em;
-        text-decoration: none;
-        color: var(--ink-soft);
-        padding: 7px 11px;
-        border-radius: 3px;
-        border: 1px solid transparent;
-    }
-
-    .sort:hover { color: var(--brand-b); }
-
-    .sort[aria-current="true"] {
-        color: var(--brand-b);
-        background: var(--tile);
-        border-color: var(--rule);
-    }
 
     /* ---------- the grid ----------
        Each tile sits on a stack of paper sheets whose thickness is derived from

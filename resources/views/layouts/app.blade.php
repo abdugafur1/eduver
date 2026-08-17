@@ -285,6 +285,35 @@
 
         /* ---------- shared bits ---------- */
 
+        /* Tab / sort links. Lives here rather than in a page's pushed styles
+           because both the browse filters and the leaderboard boards use it —
+           pushed styles are page-scoped, so the second page to want them gets
+           bare anchors. Delete the duplicate .sort block from
+           sets/index.blade.php.
+
+           (Careful writing comments in here: Blade compiles its directives
+           inside style blocks too, so a bare at-push in this text becomes a
+           directive and 500s the page. Escape it as a double-at if you need
+           to name one.) */
+        .sort {
+            font-family: var(--mono);
+            font-size: 12px;
+            letter-spacing: 0.02em;
+            text-decoration: none;
+            color: var(--ink-soft);
+            padding: 7px 11px;
+            border-radius: 3px;
+            border: 1px solid transparent;
+        }
+
+        .sort:hover { color: var(--brand-b); }
+
+        .sort[aria-current="true"] {
+            color: var(--brand-b);
+            background: var(--tile);
+            border-color: var(--rule);
+        }
+
         .eyebrow {
             font-family: var(--mono);
             font-size: 11px;

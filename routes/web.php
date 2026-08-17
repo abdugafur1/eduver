@@ -3,11 +3,23 @@
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\QuizController;
 use App\Http\Controllers\StudySetController;
+use App\Http\Controllers\LeaderboardController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/sets');
 
 Route::get('/sets', [StudySetController::class, 'index'])->name('sets.index');
+
+/*
+        | Public, like sets.index. The board is a reason to make an account,
+        | which it can't be if you need one to see it. Guests get the same rows;
+        | they just have no row of their own highlighted.
+        |
+        | The rail already does Route::has('leaderboard.index'), so defining
+        | this swaps the greyed-out trophy stub for a live link on every page —
+        | no layout change needed.
+        */
+Route::get('/leaderboard', [LeaderboardController::class, 'index'])->name('leaderboard.index');
 
 /*
  | sets.show is flashcards, not the card table. Two reasons it's the canonical
