@@ -12,13 +12,23 @@
 <style>
     .browse-head { margin-bottom: 28px; }
 
+    /*
+      Flat magenta, not a gradient clip. Two reasons: the live site's section
+      headings are flat magenta and the gradient stays on chrome; and a clipped
+      gradient paints across the element box, so on a block-level h1 the words
+      only ever saw the first half of the ramp — all blue, no pink.
+      3.2:1 on paper, so weight goes to 400 to give the strokes body, and this
+      colour never appears below 24px.
+    */
     .browse-head h1 {
         font-family: var(--display);
-        font-weight: 800;
-        font-size: clamp(30px, 5vw, 44px);
-        letter-spacing: -0.035em;
-        line-height: 1.05;
+        font-weight: 400;
+        font-size: clamp(30px, 5vw, 46px);
+        letter-spacing: -0.022em;
+        line-height: 1.08;
         margin: 6px 0 0;
+        width: fit-content;
+        color: var(--brand-b);
     }
 
     /* ---------- filters ---------- */
@@ -37,20 +47,21 @@
         display: flex;
         align-items: center;
         gap: 8px;
-        background: var(--surface);
+        background: var(--tile);
         border: 1px solid var(--rule);
-        border-radius: 3px;
+        border-radius: 2.5px;
         padding: 0 12px;
         height: 40px;
     }
 
-    .field:focus-within { border-color: var(--pine); }
+    .field:focus-within { border-color: var(--brand-a); }
 
     .field input {
         border: 0;
         outline: 0;
         background: none;
         font-family: var(--body);
+        font-weight: 300;
         font-size: 16px;
         color: var(--ink);
     }
@@ -80,7 +91,7 @@
         user-select: none;
     }
 
-    .starter-toggle input { accent-color: var(--pine); width: 14px; height: 14px; }
+    .starter-toggle input { accent-color: var(--brand-a); width: 14px; height: 14px; }
 
     .starter-badge {
         font-family: var(--mono);
@@ -108,12 +119,12 @@
         border: 1px solid transparent;
     }
 
-    .sort:hover { color: var(--ink); }
+    .sort:hover { color: var(--brand-b); }
 
     .sort[aria-current="true"] {
-        color: var(--pine);
-        background: var(--pine-wash);
-        border-color: #cfe0da;
+        color: var(--brand-b);
+        background: var(--tile);
+        border-color: var(--rule);
     }
 
     /* ---------- the grid ----------
@@ -123,26 +134,38 @@
 
     .grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
-        gap: 26px 22px;
+        grid-template-columns: 1fr;
+        gap: 50px 45px;              /* .scrollable */
         padding-right: 12px;
     }
 
+    @media (min-width: 800px)  { .grid { grid-template-columns: 1fr 1fr; } }
+    @media (min-width: 1400px) { .grid { grid-template-columns: 1fr 1fr 1fr; } }
+
     .stack { position: relative; }
 
+    /* No shadow on the sheets. Each one carrying its own smudged into the
+       tile's hard offset shadow along the right edge; a step-down in fill reads
+       as a stacked edge more cleanly and leaves one shadow on the page. */
     .stack::before,
     .stack::after {
         content: '';
         position: absolute;
         inset: 0;
         z-index: 0;
-        background: var(--surface);
-        border: 1px solid var(--rule);
-        border-radius: 4px;
+        border-radius: 2.5px;
     }
 
-    .stack::before { transform: translate(calc(var(--d) * 2.5px), calc(var(--d) * 2.5px)); }
-    .stack::after  { transform: translate(calc(var(--d) * 5px),   calc(var(--d) * 5px)); }
+    .stack::before {
+        background: #e7e7e9;
+        transform: translate(calc(var(--d) * 2.5px), calc(var(--d) * 2.5px));
+    }
+
+    .stack::after {
+        background: #e0e0e3;
+        transform: translate(calc(var(--d) * 5px), calc(var(--d) * 5px));
+    }
+
 
     .stack[data-depth="0"]::before,
     .stack[data-depth="0"]::after,
@@ -151,41 +174,49 @@
     .tile {
         /* z-index is load-bearing: ::after is the last child of .stack, so
            without it the opaque back sheet paints over the tile and hides
-           every word of content. All three are positioned, so DOM order
-           decides the stack otherwise. */
+           every word of content. */
         position: relative;
         z-index: 1;
         display: flex;
         flex-direction: column;
         gap: 10px;
         height: 100%;
-        min-height: 120px;
+        min-height: 160px;          /* .scrollable grid-auto-rows */
         padding: 18px 18px 16px;
-        background: var(--surface);
-        border: 1px solid var(--rule);
-        border-radius: 4px;
+        background: var(--tile);    /* #eeeeee, a hair darker than the page */
+        border: 0;
+        border-radius: 2.5px;       /* .menu-div, verbatim */
         text-decoration: none;
-        transition: transform 120ms ease, border-color 120ms ease;
+        box-shadow: 2.5px 2.5px 5px 2px var(--shadow);
+        transition: color 120ms ease;
     }
 
-    .tile:hover {
-        transform: translate(-2px, -2px);
-        border-color: var(--pine);
-    }
+    /* The live hover is a colour change on the link, not a lift — .menu-div a
+       goes #0064ff -> #c864c8. The offset shadow stays put, which is what makes
+       the tile feel printed rather than floating. */
+    .tile:hover .tile__title,
+    .tile:focus-visible .tile__title { color: var(--brand-b); }
 
+    /* Blue, like the tiles on /user/index — the title is the link, and this is
+       the only signal that says so once the pine underline colour is gone. */
     .tile__title {
         font-family: var(--display);
-        font-weight: 600;
+        font-weight: 500;
         font-size: 19px;
         line-height: 1.25;
-        letter-spacing: -0.015em;
-        margin: 0;
+        letter-spacing: -0.012em;
+        /* auto top margin pairs with the footer's, so on a set with no
+           description the title sits centred in the tile rather than stranded
+           at the top of a 160px box. .set-name centres the same way. */
+        margin: auto 0 0;
+        color: var(--brand-a);       /* .set-name */
+        transition: color 120ms ease;
     }
 
     .tile__desc {
         margin: 0;
         font-size: 15px;
-        line-height: 1.45;
+        line-height: 1.5;
         color: var(--ink-soft);
         display: -webkit-box;
         -webkit-line-clamp: 3;
@@ -202,12 +233,14 @@
         gap: 10px;
     }
 
+    /* Was pine. Stays neutral now that the title is blue — two blues in one
+       tile and neither one is the thing you click. */
     .tile__cards {
         font-family: var(--mono);
         font-weight: 500;
         font-variant-numeric: tabular-nums;
         font-size: 13px;
-        color: var(--pine);
+        color: var(--ink-soft);
     }
 
     .tile__owner {
