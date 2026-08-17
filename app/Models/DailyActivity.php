@@ -86,13 +86,21 @@ class DailyActivity extends Model
     /**
      * Idempotent increment against the unique key. Safe to call more than once
      * for the same event only if you're happy adding the deltas again.
+     *
+     * The lookup is whereDate(), not firstOrCreate(). firstOrCreate() would use
+     * activity_date verbatim as an equality match, and the 'date' cast
+     * serialises through the model's datetime format on write — so on a driver
+     * with no native DATE type the stored value carries 00:00:00, the match on
+     * 'Y-m-d' misses, and the second call of the day inserts straight into
+     * daily_activities_user_id_activity_date_unique. whereDate() casts the
+     * column in SQL instead, which matches on every driver.
      */
     public static function accrue(User $user, array $deltas, mixed $moment = null): self
     {
-        $row = static::firstOrCreate([
-            'user_id' => $user->getKey(),
-            'activity_date' => static::dateFor($user, $moment),
-        ]);
+        $date = static::dateFor($user, $moment);
+
+        $row = $user->dailyActivities()->whereDate('activity_date', $date)->first()
+            ?? $user->dailyActivities()->create(['activity_date' => $date]);
 
         foreach ($deltas as $column => $delta) {
             $row->increment($column, $delta);
