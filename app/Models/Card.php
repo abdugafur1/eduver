@@ -92,4 +92,13 @@ class Card extends Model
             ->where('times_tested', '>=', $minAttempts)
             ->whereRaw('times_wrong / times_tested >= ?', [$threshold]);
     }
+
+    protected static function booted(): void
+    {
+        // created and deleted only, never saved: QuizController writes
+        // times_tested and times_wrong on every answer, and recounting on
+        // `saved` would fire a COUNT query per question answered.
+        static::created(fn (Card $card) => $card->studySet?->recountCards());
+        static::deleted(fn (Card $card) => $card->studySet?->recountCards());
+    }
 }

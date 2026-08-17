@@ -4,6 +4,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\QuizController;
 use App\Http\Controllers\StudySetController;
 use App\Http\Controllers\LeaderboardController;
+use App\Http\Controllers\CardController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/sets');
@@ -41,6 +42,20 @@ Route::middleware(['auth', 'password.usable'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+
+    Route::get('/sets/create', [StudySetController::class, 'create'])->name('sets.create');
+    Route::post('/sets', [StudySetController::class, 'store'])->name('sets.store');
+    Route::get('/sets/{studySet}/edit', [StudySetController::class, 'edit'])->name('sets.edit');
+    Route::patch('/sets/{studySet}', [StudySetController::class, 'update'])->name('sets.update');
+
+
+    Route::get('/cards/create', [CardController::class, 'chooseSet'])->name('cards.create');
+    Route::get('/sets/{studySet}/cards/create', [CardController::class, 'create'])->name('sets.cards.create');
+    Route::post('/sets/{studySet}/cards', [CardController::class, 'store'])->name('sets.cards.store');
+    Route::get('/cards/{card}/edit', [CardController::class, 'edit'])->name('cards.edit');
+    Route::patch('/cards/{card}', [CardController::class, 'update'])->name('cards.update');
+    Route::delete('/cards/{card}', [CardController::class, 'destroy'])->name('cards.destroy');
 
     /*
      | Starting a quiz is keyed by set; playing one is keyed by session. They're

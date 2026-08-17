@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 /**
  * @property int    $cards_count  Denormalised counter column, NOT a withCount()
@@ -107,6 +108,22 @@ class StudySet extends Model
     {
         return $this->source === self::SOURCE_STARTER;
     }
+
+    /**
+     * 12 lowercase alphanumerics in a 22-char column. Random rather than a
+     * title slug: titles collide constantly ("GRE Vocab"), and a random key
+     * means the URL doesn't change when the title does.
+     */
+    public static function uniqueSlug(): string
+    {
+        do {
+            $slug = Str::lower(Str::random(12));
+        } while (static::withTrashed()->where('slug', $slug)->exists());
+
+        return $slug;
+    }
+
+
 
     /**
      * Hides the ~1,130 starter-pack clones. Without this the browser shows

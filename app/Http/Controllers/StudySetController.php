@@ -6,6 +6,7 @@ use App\Models\StudySet;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 
 class StudySetController extends Controller
@@ -59,6 +60,83 @@ class StudySetController extends Controller
             'sort' => $sort,
             'min' => $filters['min'] ?? null,
             'includeStarter' => $includeStarter,
+        ]);
+    }
+
+    public function create(): View
+    {
+        Gate::authorize('create', StudySet::class);
+
+        return view('sets.create');
+    }
+
+    /**
+     * Creates the set only — cards are added on the next screen. Splitting it
+     * means a long card-entry session can't lose the title to a validation
+     * error, and it gives the set an id that card entry can post against.
+     */
+    public function store(Request $request): RedirectResponse
+    {
+        Gate::authorize('create', StudySet::class);
+
+        $validated = $this->validateSet($request);
+
+        $set = StudySet::create([
+            ...$validated,
+            'user_id' => $request->user()->getKey(),
+            'slug' => StudySet::uniqueSlug(),
+            // Explicit rather than leaning on the column default: a set made
+            // here is authored by definition, and `starter` is only ever
+            // written by the legacy import.
+            'source' => StudySet::SOURCE_AUTHORED,
+        ]);
+
+        return redirect()
+            ->route('sets.terms', $set)
+            ->with('status', 'Set created. Add your first cards below.');
+    }
+
+    public function edit(Request $request, StudySet $studySet): View
+    {
+        Gate::authorize('update', $studySet);
+
+        return view('sets.edit', ['set' => $studySet]);
+    }
+
+    public function update(Request $request, StudySet $studySet): RedirectResponse
+    {
+        Gate::authorize('update', $studySet);
+
+        $studySet->update($this->validateSet($request));
+
+        return redirect()
+            ->route('sets.terms', $studySet)
+            ->with('status', 'Changes saved.');
+    }
+
+    /**
+     * Shared by store() and update(). max:128 matches the column exactly —
+     * validating looser than the schema turns a form error into a DB
+     * exception, the same trap the username field hit during registration.
+     *
+     * visibility is validated against the model constants rather than a Rule
+     * built from the column, because the column is a plain string on purpose:
+     * the allowed set lives in the application layer so it can change without
+     * a migration.
+     */
+    private function validateSet(Request $request): array
+    {
+        return $request->validate([
+            'title' => ['required', 'string', 'max:128'],
+            'description' => ['nullable', 'string', 'max:1000'],
+            'visibility' => ['required', Rule::in([
+                StudySet::VISIBILITY_PUBLIC,
+                StudySet::VISIBILITY_UNLISTED,
+                StudySet::VISIBILITY_PRIVATE,
+            ])],
+        ], [
+            'title.required' => 'Give the set a title.',
+            'visibility.required' => 'Choose who can see this set.',
         ]);
     }
 
@@ -121,6 +199,10 @@ class StudySetController extends Controller
             'set' => $studySet,
             'cards' => $cards,
             'q' => (string) $request->query('q', ''),
+            // Drives the edit controls in the template. Computed here so the
+            // view never has to reason about ownership itself.
+            'canManage' => $request->user() !== null
+                && Gate::allows('update', $studySet),
         ]);
     }
 

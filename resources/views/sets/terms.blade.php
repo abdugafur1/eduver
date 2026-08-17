@@ -10,6 +10,21 @@
 
 @push('styles')
 <style>
+    /* Gold rather than green: the palette has no green, and gold already
+       carries "pay attention to this" on visibility flags and miss rates. */
+    .flash {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        padding: 12px 16px;
+        margin-bottom: 22px;
+        background: var(--tile);
+        border-left: 3px solid var(--gold);
+        border-radius: 2.5px;
+        box-shadow: 2.5px 2.5px 5px 2px var(--shadow);
+        font-size: 16px;
+    }
+
     /* Stays a solid ink rule. The masthead sweep is 90px above it, and two
        gradient rules that close together stop reading as a signature. */
     .set-head {
@@ -87,6 +102,10 @@
     }
 
     .toolbar input[type="search"]:focus { outline: 0; border-color: var(--brand-a); }
+
+    /* Owner controls sit left of the self-test toggle, which keeps its
+       margin-left:auto and stays pinned right. */
+    .owner-tools { display: flex; gap: 8px; align-items: center; }
 
     .selftest {
         margin-left: auto;
@@ -207,6 +226,25 @@
 
     .card-miss[data-hard="1"] { color: var(--gold); font-weight: 500; }
 
+
+    /* A fifth column only for the owner. Everyone else keeps the four-column
+       grid, so a visitor's view is unchanged. */
+    .cards--manage li { grid-template-columns: 46px minmax(0, 1fr) minmax(0, 1.3fr) 52px 52px; }
+
+    .card-edit {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+        text-decoration: none;
+        text-align: right;
+        padding-top: 3px;
+    }
+
+    .card-edit:hover, .card-edit:focus-visible { color: var(--brand-b); }
+
+
     /* Self-test: masks the answers until you hover or tab to one. This is the
        closest thing to actually flipping the card, and it needs no JS. */
     #selftest:checked ~ .cards .card-def {
@@ -225,15 +263,22 @@
         background: none;
     }
 
+    .empty .btn { margin-top: 14px; }
+
     @media (max-width: 720px) {
         .cards li { grid-template-columns: 28px minmax(0, 1fr); }
         .cards li .card-def { grid-column: 2; }
         .cards li .card-miss { grid-column: 2; text-align: left; padding-top: 0; }
+        .cards--manage li { grid-template-columns: 28px minmax(0, 1fr); }
     }
 </style>
 @endpush
 
 @section('content')
+    @if (session('status'))
+        <p class="flash" role="status">{{ session('status') }}</p>
+    @endif
+
     <div class="set-head">
         <p class="eyebrow">
             {{ $set->slug }} · {{ $set->user?->name ?? 'Unknown author' }}
@@ -271,6 +316,17 @@
             @endif
         </form>
 
+        {{-- Route::has on the card routes so this page keeps rendering until
+             card entry exists. Drop the guard once those routes are defined. --}}
+        @if ($canManage)
+            <div class="owner-tools">
+                @if (Route::has('sets.cards.create'))
+                    <a class="btn" href="{{ route('sets.cards.create', $set) }}">Add cards</a>
+                @endif
+                <a class="btn btn--quiet" href="{{ route('sets.edit', $set) }}">Edit set</a>
+            </div>
+        @endif
+
         @unless ($cards->isEmpty())
             <label class="selftest" for="selftest">Hide answers</label>
         @endunless
@@ -278,16 +334,20 @@
 
     @if ($cards->isEmpty())
         <div class="empty">
-            <p>
-                @if ($q !== '')
-                    No cards in this set match “{{ $q }}”.
-                @else
-                    This set has no cards. Worth checking against the legacy export.
+            @if ($q !== '')
+                <p>No cards in this set match “{{ $q }}”.</p>
+            @elseif ($canManage)
+                <h2>No cards yet</h2>
+                <p>Add a term and its definition to start studying this set.</p>
+                @if (Route::has('sets.cards.create'))
+                    <a class="btn" href="{{ route('sets.cards.create', $set) }}">Add the first cards</a>
                 @endif
-            </p>
+            @else
+                <p>This set has no cards yet.</p>
+            @endif
         </div>
     @else
-        <ul class="cards">
+        <ul class="cards @if ($canManage) cards--manage @endif">
             @foreach ($cards as $card)
                 @php $miss = $card->missRate(); @endphp
                 <li>
@@ -305,6 +365,9 @@
                         @if ($miss !== null) data-hard="{{ $miss >= 0.4 ? 1 : 0 }}" @endif
                         @if ($miss !== null) title="Missed {{ number_format($card->times_wrong) }} of {{ number_format($card->times_tested) }} attempts" @endif
                     >{{ $miss === null ? '' : round($miss * 100).'%' }}</div>
+                    @if ($canManage && Route::has('cards.edit'))
+                        <a class="card-edit" href="{{ route('cards.edit', $card) }}">Edit</a>
+                    @endif
                 </li>
             @endforeach
         </ul>

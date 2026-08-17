@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Models\StudySet;
 
 /**
  * Imports the 2022-23-era Eduver data into the new schema.
@@ -253,7 +254,7 @@ class ImportLegacyEduver extends Command
                 }
 
                 $setId = DB::table('study_sets')->insertGetId([
-                    'slug'        => $this->uniqueSlug(),
+                    'slug'        => StudySet::uniqueSlug(),
                     'legacy_slug' => $link,
                     'user_id'     => $ownerForRow,
                     'title'       => Str::limit(trim((string) ($row->setName ?? 'Untitled set')), 120, ''),
@@ -452,15 +453,6 @@ class ImportLegacyEduver extends Command
         }
 
         return $identifier;
-    }
-
-    private function uniqueSlug(): string
-    {
-        do {
-            $slug = Str::lower(Str::random(12));
-        } while (DB::table('study_sets')->where('slug', $slug)->exists());
-
-        return $slug;
     }
 
     private function legacyDatabasesPresent(): bool
