@@ -17,6 +17,11 @@ use Tests\TestCase;
  * That touched the browse tiles and the legacy 301, and nothing asserted either
  * still worked — a broken tile would have gone unnoticed until someone clicked
  * one, and a broken 301 until an old eduver.net link was followed.
+ *
+ * Your-sets and deletion live here too rather than in a file of their own: they
+ * want the same makeSet() helper, and splitting on "reads vs writes" would put
+ * mine() — which is a listing, and reads like index — on the far side of the
+ * split from the listing tests it has to stay consistent with.
  */
 class StudySetTest extends TestCase
 {
@@ -332,5 +337,153 @@ class StudySetTest extends TestCase
 
         $this->get(route('sets.show', $set))->assertNotFound();
         $this->get(route('sets.index'))->assertDontSee('Test set');
+    }
+
+    // ------------------------------------------------------------- your sets
+
+    /**
+     * Also pins the route ordering. /sets/mine is declared inside the auth
+     * group, which sits above the /sets/{studySet} wildcard at the bottom of
+     * the file. Declared after it, this would 404 as a lookup for a set
+     * slugged "mine" instead of redirecting to login.
+     */
+    public function test_your_sets_needs_an_account(): void
+    {
+        $this->get(route('sets.mine'))->assertRedirect(route('login'));
+    }
+
+    /**
+     * The whole reason mine() queries user_id directly instead of filtering
+     * index(). scopeVisibleTo() omits unlisted from browse by design, so a
+     * shared-by-link set appears on no listing anywhere if this regresses.
+     */
+    public function test_your_sets_shows_your_private_and_unlisted_work(): void
+    {
+        $owner = User::factory()->create();
+        $this->makeSet(owner: $owner, visibility: StudySet::VISIBILITY_PRIVATE, attributes: ['title' => 'Private draft']);
+        $this->makeSet(owner: $owner, visibility: StudySet::VISIBILITY_UNLISTED, attributes: ['title' => 'Shared by link']);
+
+        $this->actingAs($owner)
+            ->get(route('sets.mine'))
+            ->assertOk()
+            ->assertViewIs('sets.mine')
+            ->assertSee('Private draft')
+            ->assertSee('Shared by link');
+    }
+
+    public function test_your_sets_excludes_everyone_elses(): void
+    {
+        $owner = User::factory()->create();
+        $this->makeSet(owner: $owner, attributes: ['title' => 'Kanji drills']);
+        $this->makeSet(attributes: ['title' => 'Somebody elses set']);
+
+        $this->actingAs($owner)
+            ->get(route('sets.mine'))
+            ->assertSee('Kanji drills')
+            ->assertDontSee('Somebody elses set');
+    }
+
+    /**
+     * Browse hides starter packs but offers ?starter=1 to bring them back.
+     * Your sets has no such escape hatch, deliberately — the query param is
+     * simply not in mine()'s validate() rules, so it's ignored rather than
+     * rejected. The second request is what pins that difference.
+     */
+    public function test_your_sets_excludes_starter_packs_with_no_way_to_ask_for_them(): void
+    {
+        $owner = User::factory()->create();
+        $this->makeSet(owner: $owner, attributes: ['title' => 'Starter vocabulary', 'source' => StudySet::SOURCE_STARTER]);
+        $this->makeSet(owner: $owner, attributes: ['title' => 'Own work']);
+
+        $this->actingAs($owner)
+            ->get(route('sets.mine'))
+            ->assertSee('Own work')
+            ->assertDontSee('Starter vocabulary');
+
+        $this->actingAs($owner)
+            ->get(route('sets.mine', ['starter' => 1]))
+            ->assertOk()
+            ->assertDontSee('Starter vocabulary');
+    }
+
+    public function test_your_sets_omits_what_you_have_deleted(): void
+    {
+        $owner = User::factory()->create();
+        $set = $this->makeSet(owner: $owner, attributes: ['title' => 'Retired set']);
+        $set->delete();
+
+        $this->actingAs($owner)
+            ->get(route('sets.mine'))
+            ->assertDontSee('Retired set');
+    }
+
+    // -------------------------------------------------------------- deleting
+
+    public function test_the_owner_can_delete_their_set(): void
+    {
+        $owner = User::factory()->create();
+        $set = $this->makeSet(owner: $owner, attributes: ['title' => 'Retired set']);
+
+        $this->actingAs($owner)
+            ->delete(route('sets.destroy', $set))
+            ->assertRedirect(route('sets.index'))
+            ->assertSessionHas('status');
+
+        $this->assertSoftDeleted($set);
+    }
+
+    public function test_a_stranger_cannot_delete_a_set(): void
+    {
+        $set = $this->makeSet(attributes: ['title' => 'Not yours']);
+
+        $this->actingAs(User::factory()->create())
+            ->delete(route('sets.destroy', $set))
+            ->assertForbidden();
+
+        $this->assertNotSoftDeleted($set);
+    }
+
+    public function test_a_guest_cannot_delete_a_set(): void
+    {
+        $set = $this->makeSet();
+
+        $this->delete(route('sets.destroy', $set))->assertRedirect(route('login'));
+
+        $this->assertNotSoftDeleted($set);
+    }
+
+    /**
+     * Nothing cascades: the trait writes deleted_at and stops. That's what
+     * makes withTrashed()->restore() worth anything, and it's only true as
+     * long as no future onDelete('cascade') lands on these tables.
+     */
+    public function test_deleting_a_set_leaves_its_cards_behind(): void
+    {
+        $owner = User::factory()->create();
+        $set = $this->makeSet(cards: 3, owner: $owner);
+
+        $this->actingAs($owner)->delete(route('sets.destroy', $set));
+
+        $this->assertSame(3, Card::where('study_set_id', $set->getKey())->count());
+    }
+
+    /**
+     * The surviving cards still route by id, and studySet is a plain belongsTo,
+     * so the relation comes back null through the global scope. A null handed
+     * to Gate resolves no policy and denies — which told the owner of a card
+     * that it wasn't theirs. The missing set has to be checked before the
+     * policy, or this comes back 403 and reads as a permissions bug.
+     */
+    public function test_a_card_on_a_deleted_set_is_gone_rather_than_forbidden(): void
+    {
+        $owner = User::factory()->create();
+        $set = $this->makeSet(cards: 1, owner: $owner);
+        $card = Card::where('study_set_id', $set->getKey())->sole();
+
+        $set->delete();
+
+        $this->actingAs($owner)
+            ->get(route('cards.edit', $card))
+            ->assertNotFound();
     }
 }
