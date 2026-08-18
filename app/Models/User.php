@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -76,6 +77,26 @@ class User extends Authenticatable
     public function quizSessions(): HasMany
     {
         return $this->hasMany(QuizSession::class);
+    }
+
+    /**
+     * The set_user pivot: sets you've saved, studied, or both.
+     *
+     * created_at means "you put this in your library" and last_studied_at
+     * means "you worked on it" — a row can have either without the other, so
+     * neither column alone is the sort key. See StudySetController::saved().
+     *
+     * Trashed sets drop out for free: this is a StudySet query underneath, so
+     * SoftDeletes' global scope applies. The orphaned pivot rows a soft delete
+     * leaves behind (the FK cascade never fires) stay in the table but can't
+     * reach a page through here. Anything reading set_user directly still
+     * needs its own guard.
+     */
+    public function savedSets(): BelongsToMany
+    {
+        return $this->belongsToMany(StudySet::class, 'set_user')
+            ->withPivot('last_studied_at')
+            ->withTimestamps();
     }
 
     public function pointTransactions(): HasMany

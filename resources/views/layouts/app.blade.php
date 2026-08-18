@@ -638,7 +638,7 @@
             // public; make it auth()->check() ? 'sets.mine' : null to keep it
             // a stub when logged out.
             ['icon' => 'my-sets',    'label' => 'Your sets',    'area' => 'mySets',  'route' => 'sets.mine'],
-            ['icon' => 'fr-sets',    'label' => 'Shared sets',  'area' => 'frSets',  'route' => null],
+            ['icon' => 'fr-sets',    'label' => 'Saved sets',   'area' => 'frSets',  'route' => 'sets.saved'],
         ];
         $railLower = [
             ['icon' => 'quests',     'label' => 'Daily quests', 'area' => 'quests',  'route' => null],

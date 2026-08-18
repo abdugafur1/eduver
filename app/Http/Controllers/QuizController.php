@@ -103,14 +103,14 @@ class QuizController extends Controller
             ->first();
 
         if (! $question) {
-            return redirect()->route('quiz.result', $this->complete($quizSession));
+            return redirect()->route('quiz.result', $this->complete($request, $quizSession));
         }
 
         // Expired questions can't be answered, and every later question in the
         // session was issued at the same moment, so the whole run is dead.
         if ($question->hasExpired()) {
             return redirect()
-                ->route('quiz.result', $this->complete($quizSession))
+                ->route('quiz.result', $this->complete($request, $quizSession))
                 ->with('quiz.error', 'That session timed out, so it was scored where you left it.');
         }
 
@@ -354,12 +354,29 @@ class QuizController extends Controller
      * Finish and pay out. Safe to call on an already-finished session: the
      * service claims completed_at with a conditional UPDATE, so a second call
      * writes no second ledger row.
+     *
+     * This is also where a set enters the user's library. On completion rather
+     * than on start(), so abandoning a run at question two doesn't file the set
+     * as something you study. syncWithoutDetaching is what makes the repeat
+     * call harmless: set_user is unique on (user_id, study_set_id), so attach()
+     * would throw on the second quiz of the same set, and this updates the
+     * timestamp on the existing row instead.
+     *
+     * Note the asymmetry with flashcards, which deliberately write nothing —
+     * see StudySetTest::test_flashcards_writes_nothing. A set you only ever
+     * flip through does not appear here; save it explicitly instead.
      */
-    private function complete(QuizSession $quizSession): QuizSession
+    private function complete(Request $request, QuizSession $quizSession): QuizSession
     {
         $quizSession->loadMissing('studySet:id,cards_count');
 
-        return app(QuizRewards::class)->settle($quizSession);
+        $settled = app(QuizRewards::class)->settle($quizSession);
+
+        $request->user()->savedSets()->syncWithoutDetaching([
+            $quizSession->study_set_id => ['last_studied_at' => now()],
+        ]);
+
+        return $settled;
     }
 
     /**

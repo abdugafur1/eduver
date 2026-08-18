@@ -53,6 +53,8 @@
         margin: 0;
     }
 
+    .set-head form { margin-top: 18px; }
+
     /* ---------- the card ---------- */
 
     .deck { max-width: 640px; }
@@ -260,6 +262,20 @@
         @if (filled($set->description))
             <p class="lede">{{ $set->description }}</p>
         @endif
+
+        {{-- Guests get nothing here rather than a login prompt: the whole
+             point of this page is that it works logged out, and a control
+             that bounces you to a form is worse than no control. --}}
+        @auth
+            <form method="post" action="{{ route($isSaved ? 'sets.unsave' : 'sets.save', $set) }}">
+                @csrf
+                @if ($isSaved) @method('delete') @endif
+
+                <button class="btn {{ $isSaved ? 'btn--quiet' : '' }}" type="submit">
+                    {{ $isSaved ? 'Saved ✓' : 'Save to library' }}
+                </button>
+            </form>
+        @endauth
     </div>
 
     @if ($cards->isEmpty())

@@ -45,6 +45,16 @@ Route::middleware(['auth', 'password.usable'])->group(function () {
 
 
     Route::get('/sets/mine', [StudySetController::class, 'mine'])->name('sets.mine');
+
+    /*
+     | The library: sets saved explicitly, plus every set a completed quiz has
+     | stamped. Declared here with the other /sets routes and inside the group,
+     | so the wildcard at the bottom of the file can't swallow "saved".
+     */
+    Route::get('/sets/saved', [StudySetController::class, 'saved'])->name('sets.saved');
+    Route::post('/sets/{studySet}/save', [StudySetController::class, 'save'])->name('sets.save');
+    Route::delete('/sets/{studySet}/save', [StudySetController::class, 'unsave'])->name('sets.unsave');
+
     Route::get('/sets/create', [StudySetController::class, 'create'])->name('sets.create');
     Route::post('/sets', [StudySetController::class, 'store'])->name('sets.store');
     Route::get('/sets/{studySet}/edit', [StudySetController::class, 'edit'])->name('sets.edit');

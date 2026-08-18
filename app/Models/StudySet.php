@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
@@ -97,6 +98,17 @@ class StudySet extends Model
     public function quizSessions(): HasMany
     {
         return $this->hasMany(QuizSession::class);
+    }
+
+    /**
+     * The other side of User::savedSets(). Used to answer "have I saved this?"
+     * on the set page without a raw pivot query.
+     */
+    public function savers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'set_user')
+            ->withPivot('last_studied_at')
+            ->withTimestamps();
     }
 
     public function isPublic(): bool

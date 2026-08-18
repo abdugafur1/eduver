@@ -106,6 +106,75 @@ class StudySetController extends Controller
     }
 
 
+    /**
+     * Your library: sets you've saved, studied, or both.
+     *
+     * Ordered by COALESCE(last_studied_at, created_at) rather than either
+     * column alone, because a row means two different things depending on how
+     * it got there — complete() stamps last_studied_at, save() only creates
+     * the row. Sorting on last_studied_at alone would bury every saved-but-
+     * unstarted set below everything you've quizzed; sorting on created_at
+     * alone would ignore the studying entirely.
+     *
+     * No starter exclusion here, unlike mine(). A starter clone you've
+     * actually worked through belongs in your library — the reason browse and
+     * your-sets hide them is that they're not authorship, which this page
+     * doesn't claim.
+     *
+     * Trashed sets need no guard: this rides User::savedSets(), which is a
+     * StudySet query with the global scope applied. Reading set_user directly
+     * would show tombstones.
+     */
+    public function saved(Request $request): View
+    {
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $sets = $request->user()
+            ->savedSets()
+            ->with('user:id,username,name')
+            ->search($filters['q'] ?? null)
+            ->orderByRaw('COALESCE(set_user.last_studied_at, set_user.created_at) DESC')
+            ->orderByDesc('study_sets.id')
+            ->paginate(self::PER_PAGE)
+            ->withQueryString();
+
+        return view('sets.saved', [
+            'sets' => $sets,
+            'q' => $filters['q'] ?? '',
+        ]);
+    }
+
+    /**
+     * Put a set in your library without studying it. Leaves last_studied_at
+     * null, which is what distinguishes "saved" from "studied" on the page.
+     *
+     * syncWithoutDetaching rather than attach: set_user is unique on
+     * (user_id, study_set_id), so a double-submit would otherwise be a
+     * constraint violation rather than a no-op.
+     */
+    public function save(Request $request, StudySet $studySet): RedirectResponse
+    {
+        abort_unless($studySet->isReadableBy($request->user()), 404);
+
+        $request->user()->savedSets()->syncWithoutDetaching([$studySet->getKey()]);
+
+        return back()->with('status', 'Saved to your library.');
+    }
+
+    /**
+     * Removes the row outright, losing last_studied_at with it. That's
+     * deliberate — the alternative is a soft "unsaved" flag, and the pivot
+     * has nowhere to put one. Studying the set again re-creates the row.
+     */
+    public function unsave(Request $request, StudySet $studySet): RedirectResponse
+    {
+        $request->user()->savedSets()->detach($studySet->getKey());
+
+        return back()->with('status', 'Removed from your library.');
+    }
+
     public function create(): View
     {
         Gate::authorize('create', StudySet::class);
@@ -235,6 +304,11 @@ class StudySetController extends Controller
             'set' => $studySet,
             'cards' => $cards,
             'truncated' => $studySet->cards_count > self::DECK_LIMIT,
+            // One indexed lookup on the unique (user_id, study_set_id), and
+            // only for signed-in visitors — the control it drives isn't
+            // rendered for guests.
+            'isSaved' => $request->user() !== null
+                && $studySet->savers()->whereKey($request->user()->getKey())->exists(),
         ]);
     }
 
