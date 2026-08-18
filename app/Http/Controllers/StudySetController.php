@@ -114,6 +114,28 @@ class StudySetController extends Controller
             ->with('status', 'Changes saved.');
     }
 
+
+    /**
+     * Soft delete: the trait and the column were already in place, so this writes
+     * deleted_at and nothing cascades. Cards and quiz history survive, and the
+     * global scope hides the set from browse and from route binding.
+     *
+     * There is no restore UI, so to the user this is permanent. Recovery is
+     * StudySet::withTrashed()->where('slug', $slug)->restore() in tinker — worth
+     * knowing before someone asks for a set back.
+     */
+    public function destroy(Request $request, StudySet $studySet): RedirectResponse
+    {
+        Gate::authorize('delete', $studySet);
+
+        $title = $studySet->title;
+        $studySet->delete();
+
+        return redirect()
+            ->route('sets.index')
+            ->with('status', 'Deleted “'.$title.'”.');
+    }
+
     /**
      * Shared by store() and update(). max:128 matches the column exactly —
      * validating looser than the schema turns a form error into a DB

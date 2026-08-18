@@ -48,6 +48,7 @@ Route::middleware(['auth', 'password.usable'])->group(function () {
     Route::post('/sets', [StudySetController::class, 'store'])->name('sets.store');
     Route::get('/sets/{studySet}/edit', [StudySetController::class, 'edit'])->name('sets.edit');
     Route::patch('/sets/{studySet}', [StudySetController::class, 'update'])->name('sets.update');
+    Route::delete('/sets/{studySet}', [StudySetController::class, 'destroy'])->name('sets.destroy');
 
 
     Route::get('/cards/create', [CardController::class, 'chooseSet'])->name('cards.create');

@@ -103,7 +103,7 @@ class CardController extends Controller
 
     public function edit(Request $request, Card $card): View
     {
-        Gate::authorize('manageCards', $card->studySet);
+        $set = $this->authorizeCard($card);
 
         return view('cards.edit', [
             'card' => $card,
@@ -113,7 +113,7 @@ class CardController extends Controller
 
     public function update(Request $request, Card $card): RedirectResponse
     {
-        Gate::authorize('manageCards', $card->studySet);
+        $set = $this->authorizeCard($card);
 
         $validated = $request->validate([
             'term' => ['required', 'string', 'max:500'],
@@ -144,7 +144,7 @@ class CardController extends Controller
 
     public function destroy(Request $request, Card $card): RedirectResponse
     {
-        Gate::authorize('manageCards', $card->studySet);
+        $set = $this->authorizeCard($card);
 
         $set = $card->studySet;
 
@@ -202,5 +202,20 @@ class CardController extends Controller
         if ($errors !== []) {
             throw ValidationException::withMessages($errors);
         }
+    }
+
+    /**
+     * A soft-deleted set leaves its cards behind and still routes by id, but
+     * studySet is a plain belongsTo — the global scope makes it null. Passing
+     * null to Gate resolves no policy and denies, so the owner of the card gets
+     * a 403 saying it isn't theirs. 404 is the honest answer: the set is gone.
+     */
+    private function authorizeCard(Card $card): StudySet
+    {
+        abort_unless($card->studySet, 404);
+
+        Gate::authorize('manageCards', $card->studySet);
+
+        return $card->studySet;
     }
 }

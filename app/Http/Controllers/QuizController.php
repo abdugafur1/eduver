@@ -369,5 +369,10 @@ class QuizController extends Controller
     private function authorizeSession(Request $request, QuizSession $quizSession): void
     {
         abort_unless($quizSession->user_id === $request->user()?->getKey(), 404);
+
+        // The set can be soft-deleted mid-session. play() and result() pass
+        // studySet to views that dereference it, and complete() reads cards_count
+        // off it inside QuizRewards — all three are 500s on a null.
+        abort_unless($quizSession->studySet, 404);
     }
 }
