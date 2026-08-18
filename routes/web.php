@@ -44,6 +44,7 @@ Route::middleware(['auth', 'password.usable'])->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
 
+    Route::get('/sets/mine', [StudySetController::class, 'mine'])->name('sets.mine');
     Route::get('/sets/create', [StudySetController::class, 'create'])->name('sets.create');
     Route::post('/sets', [StudySetController::class, 'store'])->name('sets.store');
     Route::get('/sets/{studySet}/edit', [StudySetController::class, 'edit'])->name('sets.edit');

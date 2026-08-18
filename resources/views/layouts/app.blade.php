@@ -314,6 +314,86 @@
             border-color: var(--rule);
         }
 
+        /* Page head and filter chrome. Same reasoning as .sort above: browse
+           and your-sets both use these, and pushed styles are page-scoped, so
+           the second page to want them gets an unstyled bar. Moved out of
+           sets/index.blade.php — .browse-head was renamed .page-head on the
+           way, since it is no longer only browse. */
+        .page-head { margin-bottom: 28px; }
+
+        /*
+          Flat magenta, not a gradient clip. Two reasons: the live site's
+          section headings are flat magenta and the gradient stays on chrome;
+          and a clipped gradient paints across the element box, so on a
+          block-level h1 the words only ever saw the first half of the ramp —
+          all blue, no pink.
+          3.2:1 on paper, so weight goes to 400 to give the strokes body, and
+          this colour never appears below 24px.
+        */
+        .page-head h1 {
+            font-family: var(--display);
+            font-weight: 400;
+            font-size: clamp(30px, 5vw, 46px);
+            letter-spacing: -0.022em;
+            line-height: 1.08;
+            margin: 6px 0 0;
+            width: fit-content;
+            color: var(--brand-b);
+        }
+
+        .filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            padding: 14px 0 20px;
+            border-bottom: 1px solid var(--rule);
+            margin-bottom: 28px;
+        }
+
+        .field {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--tile);
+            border: 1px solid var(--rule);
+            border-radius: 2.5px;
+            padding: 0 12px;
+            height: 40px;
+        }
+
+        .field:focus-within { border-color: var(--brand-a); }
+
+        .field input {
+            border: 0;
+            outline: 0;
+            background: none;
+            font-family: var(--body);
+            font-weight: 300;
+            font-size: 16px;
+            color: var(--ink);
+        }
+
+        .field input[type="search"] { width: 260px; max-width: 44vw; }
+        .field input[type="number"] { width: 62px; font-family: var(--mono); font-size: 14px; }
+
+        .field label {
+            font-family: var(--mono);
+            font-size: 11px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--ink-soft);
+            white-space: nowrap;
+        }
+
+        /* The container. .sort, the links inside it, is defined above. */
+        .sorts {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            margin-left: auto;
+        }
+
         .eyebrow {
             font-family: var(--mono);
             font-size: 11px;
@@ -541,7 +621,11 @@
         // to make an icon live; leave it null and it renders as a dimmed stub.
         $railItems = [
             ['icon' => 'home',       'label' => 'Home',         'area' => 'home',    'route' => 'sets.index'],
-            ['icon' => 'my-sets',    'label' => 'Your sets',    'area' => 'mySets',  'route' => null],
+            // Route::has() knows nothing about middleware, so this is live for
+            // guests too and bounces them to login. Every other rail item is
+            // public; make it auth()->check() ? 'sets.mine' : null to keep it
+            // a stub when logged out.
+            ['icon' => 'my-sets',    'label' => 'Your sets',    'area' => 'mySets',  'route' => 'sets.mine'],
             ['icon' => 'fr-sets',    'label' => 'Shared sets',  'area' => 'frSets',  'route' => null],
         ];
         $railLower = [

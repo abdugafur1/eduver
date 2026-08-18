@@ -63,6 +63,49 @@ class StudySetController extends Controller
         ]);
     }
 
+
+    /**
+     * Everything the viewer owns. Not a filtered sets.index: querying by user_id
+     * directly means visibleTo() never applies, so private and unlisted sets
+     * appear here — this is the only page that shows you your own private work.
+     * SoftDeletes keeps trashed sets out on its own.
+     *
+     * Starter packs are excluded, matching browse. They're per-account import
+     * clones, so including them would open a new user's page on five sets they
+     * didn't write. Note that CardController::chooseSet() does NOT exclude them,
+     * deliberately — you can still add cards to a starter clone, it just isn't
+     * listed as yours.
+     *
+     * No `min` filter: it exists to skim 1,400 browse results, not your dozen.
+     */
+    public function mine(Request $request): View
+    {
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'sort' => ['nullable', Rule::in(array_keys(StudySet::SORTS))],
+        ]);
+
+        $sort = $filters['sort'] ?? 'recent';
+
+        $sets = StudySet::query()
+            ->where('user_id', $request->user()->getKey())
+            ->when($sort === 'active', fn ($query) => $query->withCount([
+                'quizSessions as quiz_sessions_count' => fn ($q) => $q->whereNotNull('completed_at'),
+            ]))
+            ->excludingStarter()
+            ->search($filters['q'] ?? null)
+            ->sort($sort)
+            ->paginate(self::PER_PAGE)
+            ->withQueryString();
+
+        return view('sets.mine', [
+            'sets' => $sets,
+            'q' => $filters['q'] ?? '',
+            'sort' => $sort,
+        ]);
+    }
+
+
     public function create(): View
     {
         Gate::authorize('create', StudySet::class);
