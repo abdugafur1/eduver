@@ -270,6 +270,12 @@
         .cards li .card-def { grid-column: 2; }
         .cards li .card-miss { grid-column: 2; text-align: left; padding-top: 0; }
         .cards--manage li { grid-template-columns: 28px minmax(0, 1fr); }
+
+        /* .card-def and .card-miss are pinned to column 2 here; .card-edit was
+           left to auto-place, so on the owner's view it dropped into column 1
+           under the row counter — the one 28px column on the page, with
+           text-align: right pushing it against the number. */
+        .cards--manage li .card-edit { grid-column: 2; text-align: left; padding-top: 0; }
     }
 </style>
 @endpush

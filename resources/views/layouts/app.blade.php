@@ -238,28 +238,39 @@
         .chrome .icon [fill="currentColor"],
         .chrome .icon path[fill="currentColor"] { fill: url(#chromeGrad); }
 
+        /* In the masthead row, in normal flow. This used to be fixed at
+           bottom: 10px / left: 96px, which put it permanently over the
+           bottom-left of the content column — and there is no free corner to
+           move it to: body reserves --rail on the right, .shell is centred in
+           what's left, so at ~1190px the content runs edge to edge and both
+           bottom corners are page. Fixed chrome there covers whatever happens
+           to be scrolled under it, which on sets.show is the Multiple Choice
+           button. Padding can't fix that (it only clears the end of the
+           document, not every scroll position) and pointer-events can only
+           make the covered control clickable-but-invisible.
+
+           The cost is that the balance scrolls away with the masthead instead
+           of being permanently on screen. If it has to stay visible, this
+           wants position: sticky on .masthead, not a return to fixed. */
         .wealth {
-            position: fixed;
-            bottom: 10px;
-            /* Clears .chrome, which is pinned at left: 0 with a ~52px icon and
-               15px of padding. The live site's left: 14% was doing the same job
-               against its own bottom bar; this states the reason instead of
-               inheriting a percentage that only worked at one viewport. */
-            left: 96px;
-            z-index: 20;
             display: flex;
-            /* Sized by its contents, not fixed at 250px. With credits hidden
-               the old width left ~125px of invisible fixed box over the
-               bottom-left of the page, swallowing clicks on the tile beneath.
-               gap spaces one pill or two identically, so restoring credits
-               needs no layout change. */
             width: auto;
             gap: 12px;
+            /* .masthead__inner aligns on baseline, which would hang the pills
+               off the wordmark's. They're a block of colour, not text on the
+               same line. */
+            align-self: center;
         }
 
         /* Flat fills, not gradients — the live pills are solid, and they swap
            colours between the pill and its badge. */
         .wealth > p {
+            /* There's no global p reset in this sheet, so these carried the UA
+               default 1em — 18px at this font-size — which as flex-item margins
+               made the pills' box 36px taller than the pills. Harmless now that
+               they're in flow, but it would put 18px of dead air above and
+               below them inside the masthead row. */
+            margin: 0;
             padding: 5px 15px 5px 10px;
             border-radius: 15px;
             display: flex;
@@ -521,15 +532,8 @@
                 justify-content: flex-start;
             }
 
-            /* Pills go to the top on phones, since the bar has the bottom. */
-            .wealth {
-                position: fixed;
-                top: 10px;
-                bottom: auto;
-                left: 12px;
-                width: auto;
-                gap: 10px;
-            }
+            /* No .wealth override here any more — it rides in the masthead,
+               which is already in flow above the content at every width. */
 
             .chrome {
                 top: 4px;
@@ -571,13 +575,8 @@
                 pointer-events: none;
             }
 
-            /* Pills clear the bar; the current-page icon takes the corner the
-               bar has vacated. */
-            .wealth {
-                top: calc(20.6vw + 26px);
-                left: 14px;
-            }
-
+            /* Only the current-page icon needs moving now; the pills sit in
+               the masthead, which the body padding-top above already clears. */
             .chrome {
                 top: auto;
                 bottom: 0;
@@ -606,6 +605,19 @@
     <header class="masthead">
         <div class="shell masthead__inner">
             <a class="wordmark" href="{{ route('sets.index') }}">edu<span>ver</span></a>
+
+            {{-- Default rather than opt-in. Per-view @section('wealth') still
+                 wins, but a page that forgets it gets the pills instead of
+                 silently losing them. Sits between the wordmark and the meta
+                 slot, which keeps its margin-left: auto and stays right. --}}
+            @hasSection('wealth')
+                <div class="wealth">@yield('wealth')</div>
+            @else
+                @auth
+                    <div class="wealth">@include('partials.wealth')</div>
+                @endauth
+            @endif
+
             @hasSection('masthead')
                 @yield('masthead')
             @endif
@@ -732,16 +744,6 @@
 
     @hasSection('current-icon')
         <div class="chrome">@yield('current-icon')</div>
-    @endif
-
-    {{-- Default rather than opt-in. Per-view @section('wealth') still wins, but
-         a page that forgets it gets the pills instead of silently losing them. --}}
-    @hasSection('wealth')
-        <div class="wealth">@yield('wealth')</div>
-    @else
-        @auth
-            <div class="wealth">@include('partials.wealth')</div>
-        @endauth
     @endif
 </body>
 </html>
