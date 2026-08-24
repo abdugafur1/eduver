@@ -138,7 +138,7 @@
                     aria-label="{{ $quest['label'] }}"
                 >
                     <span style="width: {{ ($quest['progress'] / $quest['threshold']) * 100 }}%"></span>
-                    <b>{{ number_format($quest['progress']) }} / {{ number_format($quest['threshold']) }}</b>
+                    <b>{{ number_format($quest['progress']) }} / {{ number_format($quest['threshold']) }} today</b>
                 </div>
 
                 @if ($quest['claimable'])

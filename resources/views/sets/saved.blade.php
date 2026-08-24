@@ -12,11 +12,13 @@
     No @@push('styles') here on purpose, same as sets/mine: the head and filter
     chrome come from the layout, the grid brings its own via partials/set-grid.
 
-    The one divergence from mine is the missing sort strip. This page's order
-    is the feature — what you touched last, COALESCE(last_studied_at,
-    created_at) — and none of StudySet::SORTS can express it, so offering
-    "Newest" and "A–Z" would mean the default sort was the one option not
-    listed. Search stays; a long library needs it.
+    This page used to have no sort strip, on the grounds that its order is the
+    feature — what you touched last, COALESCE(last_studied_at, created_at) —
+    and none of StudySet::SORTS could express it, so a strip would have left
+    the default as the one option not listed. That was the right objection to
+    the wrong thing: the fix is naming the order, not hiding it. It's
+    `library` now, first in StudySet::LIBRARY_SORTS, and the strip below is
+    the same markup as sets/mine with a different map behind it.
 --}}
 
 @section('content')
@@ -36,11 +38,22 @@
             >
         </div>
 
+        <input type="hidden" name="sort" value="{{ $sort }}">
         <button class="btn" type="submit">Search</button>
 
         @if ($q !== '')
-            <a class="btn btn--quiet" href="{{ route('sets.saved') }}">Clear search</a>
+            <a class="btn btn--quiet" href="{{ route('sets.saved', array_filter(['sort' => $sort])) }}">Clear search</a>
         @endif
+
+        <div class="sorts">
+            @foreach (\App\Models\StudySet::LIBRARY_SORTS as $key => $label)
+                <a
+                    class="sort"
+                    href="{{ route('sets.saved', array_filter(['q' => $q, 'sort' => $key])) }}"
+                    @if ($sort === $key) aria-current="true" @endif
+                >{{ $label }}</a>
+            @endforeach
+        </div>
     </form>
 
     @if ($sets->isEmpty())

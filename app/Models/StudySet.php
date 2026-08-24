@@ -47,6 +47,32 @@ class StudySet extends Model
         'alpha'   => 'A–Z',
     ];
 
+    /**
+     * The pivot ordering on sets.saved: COALESCE(last_studied_at, created_at),
+     * i.e. what you touched last. Not in SORTS because it can only be
+     * expressed on a query joined to set_user — selecting it on browse would
+     * be a missing-column error.
+     */
+    public const SORT_LIBRARY = 'library';
+
+    /**
+     * The strip on sets.saved. A subset of SORTS with the pivot order in
+     * front, which is what lets that page offer a sort at all: its default
+     * ordering now has a name, so it can be listed like everything else
+     * rather than being the one option not on the strip.
+     *
+     * `active` is deliberately absent. It counts everyone's completed
+     * sessions, so next to a library sorted by your own activity it would be
+     * two different meanings of "most studied" side by side. `recent` is out
+     * for a smaller reason: when a set was authored says nothing about your
+     * relationship to it, which is all this page is about.
+     */
+    public const LIBRARY_SORTS = [
+        self::SORT_LIBRARY => 'Recently active',
+        'alpha'            => 'A–Z',
+        'largest'          => 'Most cards',
+    ];
+
     protected $fillable = [
         'slug',
         'user_id',
@@ -199,14 +225,21 @@ class StudySet extends Model
     /**
      * `recent` rides study_sets_visibility_created_at_index. `active` orders by
      * the withCount() alias, so the caller must apply withCount('quizSessions').
+     *
+     * Every column is qualified, because sets.saved applies this scope on top
+     * of the set_user join and that pivot carries a created_at of its own —
+     * unqualified, `recent` is an ambiguous column error rather than a sort.
+     * quiz_sessions_count stays bare: it's a select alias, not a column.
      */
     public function scopeSort(Builder $query, ?string $sort): Builder
     {
+        $table = $query->getModel()->getTable();
+
         return match ($sort) {
-            'largest' => $query->orderByDesc('cards_count')->orderBy('title'),
-            'active'  => $query->orderByDesc('quiz_sessions_count')->orderByDesc('id'),
-            'alpha'   => $query->orderBy('title')->orderBy('id'),
-            default   => $query->orderByDesc('created_at')->orderByDesc('id'),
+            'largest' => $query->orderByDesc("{$table}.cards_count")->orderBy("{$table}.title"),
+            'active'  => $query->orderByDesc('quiz_sessions_count')->orderByDesc("{$table}.id"),
+            'alpha'   => $query->orderBy("{$table}.title")->orderBy("{$table}.id"),
+            default   => $query->orderByDesc("{$table}.created_at")->orderByDesc("{$table}.id"),
         };
     }
 

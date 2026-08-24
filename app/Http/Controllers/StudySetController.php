@@ -124,25 +124,42 @@ class StudySetController extends Controller
      * Trashed sets need no guard: this rides User::savedSets(), which is a
      * StudySet query with the global scope applied. Reading set_user directly
      * would show tombstones.
+     *
+     * The sort strip is LIBRARY_SORTS rather than SORTS, and the default is a
+     * named key rather than an unnamed special case — which is what lets this
+     * page carry a $sort like mine() does. scopeSort() is applied to a joined
+     * query here, so it qualifies its columns; set_user has a created_at too.
      */
     public function saved(Request $request): View
     {
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
+            'sort' => ['nullable', Rule::in(array_keys(StudySet::LIBRARY_SORTS))],
         ]);
+
+        $sort = $filters['sort'] ?? StudySet::SORT_LIBRARY;
 
         $sets = $request->user()
             ->savedSets()
             ->with('user:id,username,name')
             ->search($filters['q'] ?? null)
-            ->orderByRaw('COALESCE(set_user.last_studied_at, set_user.created_at) DESC')
-            ->orderByDesc('study_sets.id')
+            ->when(
+                $sort === StudySet::SORT_LIBRARY,
+                // Ties broken on id: two sets saved in the same second would
+                // otherwise page unstably. The other branch doesn't need it,
+                // scopeSort() breaks its own ties.
+                fn ($query) => $query
+                    ->orderByRaw('COALESCE(set_user.last_studied_at, set_user.created_at) DESC')
+                    ->orderByDesc('study_sets.id'),
+                fn ($query) => $query->sort($sort),
+            )
             ->paginate(self::PER_PAGE)
             ->withQueryString();
 
         return view('sets.saved', [
             'sets' => $sets,
             'q' => $filters['q'] ?? '',
+            'sort' => $sort,
         ]);
     }
 
