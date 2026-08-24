@@ -7,6 +7,7 @@ use App\Models\QuizSession;
 use App\Models\StudySet;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\MakesStudySets;
 use Tests\TestCase;
 
 /**
@@ -21,49 +22,14 @@ use Tests\TestCase;
  * Your-sets and deletion live here too rather than in a file of their own: they
  * want the same makeSet() helper, and splitting on "reads vs writes" would put
  * mine() — which is a listing, and reads like index — on the far side of the
- * split from the listing tests it has to stay consistent with.
+ * split from the listing tests it has to stay consistent with. Card management
+ * does live elsewhere; makeSet() moved to Tests\Concerns\MakesStudySets when
+ * CardOrderTest needed it too.
  */
 class StudySetTest extends TestCase
 {
     use RefreshDatabase;
-
-    /**
-     * Built explicitly rather than through a factory: cards_count is a
-     * denormalised column, and recountCards() is the model's own reconciler.
-     */
-    private function makeSet(
-        int $cards = 4,
-        ?User $owner = null,
-        string $visibility = StudySet::VISIBILITY_PUBLIC,
-        array $attributes = [],
-    ): StudySet {
-        $set = StudySet::create([
-            'slug' => 'set-'.str()->random(10),
-            'user_id' => ($owner ?? User::factory()->create())->getKey(),
-            'title' => 'Test set',
-            'visibility' => $visibility,
-        ]);
-
-        // forceFill, because not everything a test needs to set is fillable.
-        // legacy_slug in particular is guarded — only the importer writes it,
-        // and create() drops it silently, which is the model behaving correctly.
-        if ($attributes !== []) {
-            $set->forceFill($attributes)->save();
-        }
-
-        for ($i = 1; $i <= $cards; $i++) {
-            Card::create([
-                'study_set_id' => $set->getKey(),
-                'position' => $i,
-                'term' => "term {$i}",
-                'definition' => "definition {$i}",
-            ]);
-        }
-
-        $set->recountCards();
-
-        return $set->refresh();
-    }
+    use MakesStudySets;
 
     // ------------------------------------------------------------------ browsing
 
@@ -267,6 +233,22 @@ class StudySetTest extends TestCase
         // Parameters go in one array: route()'s third argument is \$absolute.
         $this->get(route('sets.terms', ['studySet' => $set, 'q' => 'term 7']))
             ->assertViewHas('cards', fn ($cards) => $cards->total() === 1);
+    }
+
+    /**
+     * The row number is a CSS counter, reset on every render — so page 2 of an
+     * 85-card set started again at 1. Seeded from the paginator now, which is
+     * the same number its "61-85 of 85" footer is built from.
+     */
+    public function test_the_terms_table_numbers_rows_across_pages(): void
+    {
+        $set = $this->makeSet(cards: 65);
+
+        $this->get(route('sets.terms', $set))
+            ->assertSee('counter-reset: card 0', escape: false);
+
+        $this->get(route('sets.terms', ['studySet' => $set, 'page' => 2]))
+            ->assertSee('counter-reset: card 60', escape: false);
     }
 
     public function test_the_terms_table_honours_visibility(): void
