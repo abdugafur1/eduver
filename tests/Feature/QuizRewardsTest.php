@@ -2,14 +2,14 @@
 
 namespace Tests\Feature;
 
-use App\Models\Card;
 use App\Models\DailyActivity;
 use App\Models\PointTransaction;
 use App\Models\QuizSession;
-use App\Models\StudySet;
 use App\Models\User;
 use App\Services\QuizRewards;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\MakesStudySets;
+use Tests\Concerns\PlaysQuizzes;
 use Tests\TestCase;
 
 /**
@@ -22,60 +22,7 @@ use Tests\TestCase;
  */
 class QuizRewardsTest extends TestCase
 {
-    use RefreshDatabase;
-
-    private function makeSet(int $cards, ?User $owner = null): StudySet
-    {
-        $set = StudySet::create([
-            'slug' => 'set-'.str()->random(10),
-            'user_id' => ($owner ?? User::factory()->create())->getKey(),
-            'title' => 'Test set',
-            'visibility' => 'public',
-        ]);
-
-        for ($i = 1; $i <= $cards; $i++) {
-            Card::create([
-                'study_set_id' => $set->getKey(),
-                'position' => $i,
-                'term' => "term {$i}",
-                'definition' => "definition {$i}",
-            ]);
-        }
-
-        $set->recountCards();
-
-        return $set->refresh();
-    }
-
-    /**
-     * Play a whole session correctly and return it, settled.
-     *
-     * Answers are read from the database, which is the only place the correct
-     * one exists — the same reason a real client can't do this.
-     */
-    private function playPerfectly(User $user, StudySet $set, string $route = 'sets.quiz.multiple_choice'): QuizSession
-    {
-        $this->actingAs($user)->get(route($route, $set));
-
-        $session = QuizSession::query()
-            ->where('user_id', $user->getKey())
-            ->where('study_set_id', $set->getKey())
-            ->whereNull('completed_at')
-            ->latest('id')
-            ->sole();
-
-        foreach ($session->questions()->ordered()->get() as $question) {
-            $this->actingAs($user)->post(route('quiz.answer', $session), [
-                'question_id' => $question->getKey(),
-                'choice' => array_search($question->expected_answer, $question->options(), true),
-            ]);
-        }
-
-        // Settlement happens when play() finds no unanswered question left.
-        $this->actingAs($user)->get(route('quiz.play', $session));
-
-        return $session->refresh();
-    }
+    use MakesStudySets, PlaysQuizzes, RefreshDatabase;
 
     public function test_a_finished_session_pays_ten_per_correct_answer(): void
     {
