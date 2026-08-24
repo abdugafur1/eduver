@@ -165,6 +165,8 @@
         box-shadow: 2.5px 2.5px 5px 2px var(--shadow);
         overflow: hidden;
         background: var(--tile);
+        /* Overridden inline per page — see the ul below. Kept here so the
+           counter still exists if the attribute is ever dropped. */
         counter-reset: card;
     }
 
@@ -329,6 +331,11 @@
                 @if (Route::has('sets.cards.create'))
                     <a class="btn" href="{{ route('sets.cards.create', $set) }}">Add cards</a>
                 @endif
+                {{-- Only worth offering with something to reorder. One card
+                     has exactly one order. --}}
+                @if (Route::has('sets.cards.order') && $set->cards_count > 1)
+                    <a class="btn btn--quiet" href="{{ route('sets.cards.order', $set) }}">Reorder</a>
+                @endif
                 <a class="btn btn--quiet" href="{{ route('sets.edit', $set) }}">Edit set</a>
             </div>
         @endif
@@ -353,7 +360,14 @@
             @endif
         </div>
     @else
-        <ul class="cards @if ($canManage) cards--manage @endif">
+        {{-- The counter is reset per render, so page 2 of an 85-card set
+             started again at 1. firstItem() is the paginator's own 1-based
+             index of the first row on this page, and counter-reset seeds the
+             value *before* the first increment — hence the -1. --}}
+        <ul
+            class="cards @if ($canManage) cards--manage @endif"
+            style="counter-reset: card {{ ($cards->firstItem() ?? 1) - 1 }}"
+        >
             @foreach ($cards as $card)
                 @php $miss = $card->missRate(); @endphp
                 <li>

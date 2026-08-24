@@ -20,6 +20,16 @@ class CardController extends Controller
     private const MAX_ROWS = 50;
 
     /**
+     * How many rows the reorder screen renders. Same number as flashcards'
+     * DECK_LIMIT and for the same reason: one page, no pagination, because
+     * positions are global to the set and reordering inside a filtered or
+     * paginated view would place a card relative to neighbours that aren't
+     * its real ones. Sets past this can't be reordered by hand here — see
+     * order().
+     */
+    private const REORDER_LIMIT = 400;
+
+    /**
      * The rail's "add cards" icon has no set in scope, so it lands here and
      * asks which one. Sets the viewer can't write to are never listed, which
      * makes this the only place in the app that answers "what have I made".
@@ -99,6 +109,121 @@ class CardController extends Controller
         return redirect()
             ->route('sets.terms', $studySet)
             ->with('status', $added.' '.str('card')->plural($added).' added.');
+    }
+
+    /**
+     * The reorder screen: every card in one form, one submit.
+     *
+     * Not up/down arrows per row. They fit the no-JS house style, but moving a
+     * card from the bottom of a 112-card set to the top is 111 round trips.
+     * The number inputs are the mechanism for everyone; drag is a progressive
+     * enhancement over the same server-rendered rows, and rewrites those same
+     * inputs before submit.
+     *
+     * Nothing is written here. The inputs are numbered 1..n by loop index
+     * rather than from the stored position, so a legacy set where every row is
+     * still 0 renders as a sensible starting order without this GET having to
+     * normalise anything. The first save is what makes it dense.
+     */
+    public function order(Request $request, StudySet $studySet): View
+    {
+        Gate::authorize('manageCards', $studySet);
+
+        $cards = $studySet->cards()
+            ->ordered()
+            ->limit(self::REORDER_LIMIT)
+            ->get(['id', 'term', 'definition']);
+
+        return view('cards.order', [
+            'set' => $studySet,
+            'cards' => $cards,
+            'overLimit' => $studySet->cards_count > self::REORDER_LIMIT,
+            'limit' => self::REORDER_LIMIT,
+        ]);
+    }
+
+    /**
+     * Apply a submitted order.
+     *
+     * The submitted numbers are a ranking, not positions. They're sorted, ties
+     * broken by current order, and then rewritten as a dense 1..n — so
+     * duplicates, gaps, and "make this one 0 to send it to the front" all do
+     * something sensible instead of erroring, and moving a card 90 places is
+     * one number rather than 90 drags.
+     *
+     * Every card is loaded, not just the page's worth: on a set past
+     * REORDER_LIMIT the rows the screen never showed still need positions, or
+     * they'd keep old numbers that interleave with the new dense ones. They
+     * sort after everything submitted, in their existing order.
+     */
+    public function reorder(Request $request, StudySet $studySet): RedirectResponse
+    {
+        Gate::authorize('manageCards', $studySet);
+
+        $validated = $request->validate([
+            'positions' => ['required', 'array'],
+            // Bounded by the column: position is smallint unsigned. min:0 so
+            // "0" remains a usable way to say "first" from the keyboard.
+            'positions.*' => ['required', 'integer', 'min:0', 'max:65535'],
+        ], [
+            'positions.required' => 'Nothing to reorder.',
+            'positions.*.integer' => 'Positions have to be whole numbers.',
+        ]);
+
+        $submitted = $validated['positions'];
+
+        $cards = $studySet->cards()->ordered()->get(['id']);
+
+        if ($cards->isEmpty()) {
+            return redirect()->route('sets.terms', $studySet);
+        }
+
+        $ranked = $cards->values()
+            ->map(fn (Card $card, int $index) => [
+                'id' => $card->getKey(),
+                // Cards the form didn't carry sort after everything it did,
+                // keeping their relative order via the index tie-break.
+                'rank' => array_key_exists($card->getKey(), $submitted)
+                    ? (int) $submitted[$card->getKey()]
+                    : PHP_INT_MAX,
+                'index' => $index,
+            ])
+            ->sortBy([['rank', 'asc'], ['index', 'asc']])
+            ->values();
+
+        DB::transaction(function () use ($ranked, $studySet) {
+            // One statement rather than a loop of up to 400 UPDATEs. Safe in a
+            // single pass because cards_study_set_id_position_index is not
+            // unique — were it unique, writing 1..n over an existing 1..n
+            // would collide partway through and need a negative offset pass
+            // first.
+            //
+            // Raw, so Eloquent's timestamps don't apply; updated_at is set
+            // explicitly. No model events fire either, which is fine: Card's
+            // booted() hooks created and deleted only, and cards_count can't
+            // change here.
+            $cases = [];
+            $bindings = [];
+
+            foreach ($ranked as $rank => $row) {
+                $cases[] = 'when ? then ?';
+                $bindings[] = $row['id'];
+                $bindings[] = $rank + 1;
+            }
+
+            $ids = $ranked->pluck('id')->all();
+
+            DB::update(
+                'update cards set position = case id '.implode(' ', $cases).' else position end, '
+                .'updated_at = ? where study_set_id = ? and id in ('
+                .implode(', ', array_fill(0, count($ids), '?')).')',
+                [...$bindings, now(), $studySet->getKey(), ...$ids],
+            );
+        });
+
+        return redirect()
+            ->route('sets.terms', $studySet)
+            ->with('status', 'Card order saved.');
     }
 
     public function edit(Request $request, Card $card): View
