@@ -641,7 +641,7 @@
             ['icon' => 'fr-sets',    'label' => 'Saved sets',   'area' => 'frSets',  'route' => 'sets.saved'],
         ];
         $railLower = [
-            ['icon' => 'quests',     'label' => 'Daily quests', 'area' => 'quests',  'route' => null],
+            ['icon' => 'quests',     'label' => 'Daily quests', 'area' => 'quests',  'route' => 'quests.index'],
             ['icon' => 'profile',    'label' => 'Profile',      'area' => 'profile', 'route' => 'profile.edit'],
         ];
     @endphp

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\QuestController;
 use App\Http\Controllers\QuizController;
 use App\Http\Controllers\StudySetController;
 use App\Http\Controllers\LeaderboardController;
@@ -61,6 +62,14 @@ Route::middleware(['auth', 'password.usable'])->group(function () {
     Route::patch('/sets/{studySet}', [StudySetController::class, 'update'])->name('sets.update');
     Route::delete('/sets/{studySet}', [StudySetController::class, 'destroy'])->name('sets.destroy');
 
+
+    /*
+     | Daily quests. Both routes are auth-only, so the rail's Route::has()
+     | lights the icon for guests too and the middleware bounces them to
+     | login — same as sets.mine and sets.saved.
+     */
+    Route::get('/quests', [QuestController::class, 'index'])->name('quests.index');
+    Route::post('/quests/claim', [QuestController::class, 'claim'])->name('quests.claim');
 
     Route::get('/cards/create', [CardController::class, 'chooseSet'])->name('cards.create');
     Route::get('/sets/{studySet}/cards/create', [CardController::class, 'create'])->name('sets.cards.create');

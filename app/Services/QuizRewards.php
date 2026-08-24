@@ -122,21 +122,16 @@ class QuizRewards
 
         $session->forceFill(['points_awarded' => $points])->save();
 
-        // source is polymorphic. If AppServiceProvider registers a morph map,
-        // source_type will store the alias rather than the FQCN — either way
-        // morphTo() resolves it, so nothing here needs to know which.
-        $user->pointTransactions()->create([
-            'currency' => PointTransaction::CURRENCY_POINTS,
-            'amount' => $points,
-            'reason' => 'quiz',
-            'source_type' => $session->getMorphClass(),
-            'source_id' => $session->getKey(),
-            'balance_after' => $user->total_points + $points,
-        ]);
-
-        // Cache column, written in the same transaction as the ledger row it
-        // summarises. balanceAudit() compares the two.
-        $user->increment('total_points', $points);
+        // Ledger owns the row-plus-column pair; quests mint through the same
+        // method. We're inside settle()'s transaction with $user locked, which
+        // is that method's calling contract.
+        app(Ledger::class)->credit(
+            $user,
+            $points,
+            'quiz',
+            PointTransaction::CURRENCY_POINTS,
+            $session,
+        );
 
         return $points;
     }
