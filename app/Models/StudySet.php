@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -210,8 +211,19 @@ class StudySet extends Model
     }
 
     /**
-     * Reconcile the counter column against reality. Worth running once after
-     * the import, and from Card's saved/deleted events once editing exists.
+     * What cards_count is supposed to equal. Correlated on the outer table by
+     * name rather than an alias, because `UPDATE study_sets s SET ...` is a
+     * MySQL spelling and this statement also has to run under the test driver.
+     */
+    private const ACTUAL_CARDS = '(select count(*) from cards where cards.study_set_id = study_sets.id)';
+
+    /**
+     * Reconcile this set's counter against reality. Card's created/deleted
+     * hooks call this, which covers every write that goes through Eloquent.
+     *
+     * Bulk writes don't fire model events, so anything using the query builder
+     * — DB::table('cards')->insert(), a mass delete — leaves this column
+     * stale and has to reconcile itself. See recountAll().
      */
     public function recountCards(): int
     {
@@ -222,6 +234,44 @@ class StudySet extends Model
             ->update(['cards_count' => $count]);
 
         return $this->cards_count = $count;
+    }
+
+    /**
+     * Sets whose counter disagrees with the cards actually there.
+     *
+     * Nothing in the app should ever match this. It matching is the symptom of
+     * a bulk write that skipped Eloquent, which is why sets:recount-cards
+     * reports before it repairs — the number of drifted rows is the
+     * interesting part, not the fix.
+     */
+    public function scopeMiscounted(Builder $query): Builder
+    {
+        return $query->whereRaw('cards_count <> '.self::ACTUAL_CARDS);
+    }
+
+    /**
+     * Repair every drifted counter in one statement. Returns rows changed.
+     *
+     * Trashed sets are excluded by default and it matters which way that
+     * defaults: sets:dedupe-starters hard-deletes the cards of the ~1,100
+     * copies it drops but only soft-deletes the sets themselves, so every one
+     * of those rows is permanently "miscounted" and would bury a real drift
+     * under a thousand rows of expected noise.
+     *
+     * toBase() so this doesn't touch updated_at. Reconciling a counter is not
+     * an edit to the set, and CardController::chooseSet() lists by updated_at.
+     */
+    public static function recountAll(bool $withTrashed = false): int
+    {
+        $query = static::query()->miscounted();
+
+        if ($withTrashed) {
+            $query->withTrashed();
+        }
+
+        return $query->toBase()->update([
+            'cards_count' => DB::raw(self::ACTUAL_CARDS),
+        ]);
     }
 
     /** How thick the card stack renders in the browser grid (0–3). */

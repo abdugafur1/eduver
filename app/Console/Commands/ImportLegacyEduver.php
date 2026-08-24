@@ -62,6 +62,9 @@ class ImportLegacyEduver extends Command
         'merged_duplicate_users' => 0,
         'sets' => 0,
         'cards' => 0,
+        // Sets whose counter the final reconcile had to move off 0. Should
+        // equal 'sets' minus any set that genuinely imported with no cards.
+        'recounted' => 0,
         'shares' => 0,
         'skipped_missing_cards' => 0,
         'skipped_duplicate_set' => 0,
@@ -384,12 +387,18 @@ class ImportLegacyEduver extends Command
     // Helpers
     // -----------------------------------------------------------------
 
+    /**
+     * importCards() writes through the query builder, so Card::booted() never
+     * fires and every cards_count inserted above is still 0. This is the one
+     * place in the codebase allowed to leave that column stale, and only
+     * because it reconciles here, inside the same transaction.
+     *
+     * withTrashed: nothing is soft-deleted mid-import, but the honest reading
+     * of "reconcile what I just wrote" is every row, not every visible row.
+     */
     private function recountSets(): void
     {
-        DB::statement('
-            UPDATE study_sets s
-            SET cards_count = (SELECT COUNT(*) FROM cards c WHERE c.study_set_id = s.id)
-        ');
+        $this->stats['recounted'] = StudySet::recountAll(withTrashed: true);
     }
 
     /** Per-user set tables: everything in cpUsers except the system tables. */
