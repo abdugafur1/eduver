@@ -140,6 +140,19 @@
         </svg>
         @break
 
+    {{-- Three plain dots, vertical, no plate — traced off the live phone bar
+         rather than built from the duotone kit. The first attempt gave it a
+         currentColor body like 'quests', which renders as a white tile sitting
+         on the gradient: every other glyph is the page punched out of the bar,
+         and a filled plate is the one shape that reads as stuck on top of it. --}}
+    @case('more')
+        <svg class="icon" width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="20" cy="8" r="3.6" fill="currentColor"/>
+        <circle cx="20" cy="20" r="3.6" fill="currentColor"/>
+        <circle cx="20" cy="32" r="3.6" fill="currentColor"/>
+        </svg>
+        @break
+
     @case('logout')
         <svg class="icon" width="41" height="36" viewBox="0 0 41 36" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M40.1412 19.728C41.1396 18.728 41.1396 17.104 40.1412 16.104L29.9182 5.864C28.9199 4.864 27.2986 4.864 26.3003 5.864C25.3019 6.864 25.3019 8.488 26.3003 9.488L32.1625 15.36H15.3345C13.9209 15.36 12.7787 16.504 12.7787 17.92C12.7787 19.336 13.9209 20.48 15.3345 20.48H32.1625L26.3003 26.352C25.3019 27.352 25.3019 28.976 26.3003 29.976C27.2986 30.976 28.9199 30.976 29.9182 29.976L40.1412 19.736V19.728ZM12.7787 5.12C14.1924 5.12 15.3345 3.976 15.3345 2.56C15.3345 1.144 14.1924 0 12.7787 0H7.66725C3.43429 0 0 3.44 0 7.68V28.16C0 32.4 3.43429 35.84 7.66725 35.84H12.7787C14.1924 35.84 15.3345 34.696 15.3345 33.28C15.3345 31.864 14.1924 30.72 12.7787 30.72H7.66725C6.2536 30.72 5.1115 29.576 5.1115 28.16V7.68C5.1115 6.264 6.2536 5.12 7.66725 5.12H12.7787Z" fill="currentColor"/>

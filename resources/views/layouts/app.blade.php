@@ -474,6 +474,164 @@
         .pagination { margin-top: 40px; font-family: var(--mono); font-size: 13px; }
         .pagination svg { width: 16px; height: 16px; }
 
+        /* ---------- the more-menu ----------
+           Only exists on the phone bar: the side rail shows every destination
+           already, so there is nothing to overflow. Declared display:none here
+           rather than only inside the media query because .rail is a grid with
+           named areas at this width, and an unplaced child would auto-place
+           itself into a row. */
+
+        .more { display: none; }
+
+        .more__toggle {
+            position: relative;
+            z-index: 3;
+            display: inline-flex;
+            align-items: center;
+            cursor: pointer;
+            list-style: none;          /* Firefox */
+            transition: opacity 120ms ease;
+        }
+
+        /* Safari draws its own disclosure triangle from this pseudo-element,
+           which list-style alone doesn't remove. */
+        .more__toggle::-webkit-details-marker { display: none; }
+
+        .more__toggle:hover { opacity: 0.75; }
+
+        /* A strip spanning the bar, not a dropdown hanging off the button —
+           the live menu's shape. Fixed rather than absolute so it can span the
+           viewport while living inside .more: the same 14px inset as .rail's
+           own padding, so its ends line up with the bar's end icons.
+
+           72px clears the 60px bar with a 12px gap. */
+        /* .extraIcons, ported: same insets, height, radius and shadow. The
+           right: 20% is the edge column's lane, and it's the same 20% live
+           keeps clear of .content-cont, so the strip and the page agree about
+           where that column lives.
+
+           No background — it's a backdrop blur, which is why the crest reads
+           through it in the reference shots. That was the thing a solid tile
+           couldn't reproduce. */
+        .more__panel {
+            position: fixed;
+            left: 2.5%;
+            right: 20%;
+            bottom: 80px;
+            height: 60px;
+            z-index: 3;
+            padding: 0 6px;
+            border-radius: 5px;
+            box-shadow: 2.5px 2.5px 5px 2px var(--shadow);
+            backdrop-filter: blur(35px);
+            -webkit-backdrop-filter: blur(35px);
+            color: var(--ink);
+            animation: more-reveal 220ms ease;
+        }
+
+        /* Firefox before 103 and anything older: a blur that does nothing
+           leaves icons on bare page. */
+        @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+            .more__panel { background: var(--tile); }
+        }
+
+        /* An animation rather than a transition: details hides its content
+           outright, so there is no from-state to transition out of when it
+           opens. Closing is therefore instant — the reduced-motion block at
+           the foot of this sheet flattens the open too. */
+        @keyframes more-reveal {
+            from { clip-path: circle(0% at 100% 100%); }
+            to   { clip-path: circle(150% at 100% 100%); }
+        }
+
+        @keyframes more-reveal--top {
+            from { clip-path: circle(0% at 100% 0%); }
+            to   { clip-path: circle(150% at 100% 0%); }
+        }
+
+        .more__list {
+            display: flex;
+            align-items: center;
+            justify-content: space-around;   /* .extraIcons */
+            height: 100%;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* space-around does the spacing, so the items keep their own width —
+           live's strip is three glyphs at natural size, not three equal cells
+           with icons centred in them. */
+        .more__list li { flex: 0 0 auto; }
+
+        /* Live carries no labels. They stay in the markup and go to assistive
+           tech and to a no-CSS render; only the sighted layout drops them.
+           Deleting this rule is most of the way back to a labelled list. */
+        .more__list span {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            margin: -1px;
+            padding: 0;
+            overflow: hidden;
+            clip-path: inset(50%);
+            white-space: nowrap;
+        }
+
+        /* Two classes deep, to beat `.rail a` (0,1,1) rather than relying on
+           source order — that rule sizes its icons for a grid cell on the side
+           rail, which is not what a slot in this strip wants. */
+        .rail .more__list a,
+        .rail .more__list button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            justify-self: stretch;
+            padding: 4px 10px;
+            border-radius: 5px;
+            font: inherit;
+            text-decoration: none;
+            color: var(--ink);
+        }
+
+        /* --rule, not --paper: the panel is --tile (#eeeeee) and paper is
+           #eeeef0, so a paper hover would be invisible on it. The panel reads
+           as floating on its shadow rather than its fill, same as .order__list
+           and the set tiles. */
+        .rail .more__list a:hover,
+        .rail .more__list button:hover {
+            opacity: 1;
+            background: var(--rule);
+        }
+
+        .more__list form { margin: 0; }
+
+        /* No size override anywhere in the ported CSS: the glyphs carry their
+           own dimensions (36x48 for the documents, 40x40 for the rest) and
+           live scales them with a transform at the extremes rather than
+           setting a box. Forcing 28px square was squashing the two documents. */
+        .more__list .icon { flex: none; }
+
+        /* The glyphs are built to be the background punched out of the brand
+           gradient — right on the rail, wrong here, where inheriting --ink
+           turned 'quests' into a black square and the two document icons into
+           dark blocks.
+
+           So the two layers swap: the currentColor body takes the gradient,
+           the way .chrome does it, and the inner shape is knocked out white.
+           That's literally what live ships — its .extraIcons glyphs are a
+           separate set of SVGs with gradient bodies and fill="white" inside,
+           rather than the rail's white bodies. White rather than --tile
+           because the panel has no fill of its own to match.
+
+           Attribute selectors rather than classes on the shapes, so a glyph
+           added to rail-icon later is handled without being marked up for it.
+           Every inner shape in that file is a url(#paint…) gradient. */
+        .more__list .icon [fill="currentColor"] { fill: url(#chromeGrad); }
+        .more__list .icon [fill^="url(#paint"] { fill: #fff; }
+
+        .more__list :focus-visible { outline-color: var(--brand-a); }
+
         /* ---------- narrow ----------
            The live breakpoint is min-width 600 AND min-height 700; below that
            the whole rail becomes a bottom bar. Same idea here, minus the curve,
@@ -482,21 +640,31 @@
            a docked bar below that. header-phone.css owns everything under
            599px; header-tablet.css takes over above it. */
         @media (max-width: 599px), (max-height: 699px) {
-            body { padding-right: 0; padding-bottom: 92px; }
+            /* 72.5px is where live floats .content-cont above the bar; the
+               bar itself is 50px, so that's the bar plus a 22px gap. */
+            body { padding-right: 0; padding-bottom: 72px; }
+
+            /* .content-cont is inset right: 20% — the same 20% the strip stops
+               at. That's what keeps the page from running under the edge
+               column, which ours had nothing reserving space for. */
+            main.shell { padding-right: 20%; }
 
             /* The phone bar has its own curve — .nav-spice, 375x232, cresting
                on the right. The bar is 60px; the SVG is taller and sits behind
                it so the crest rises above the icon row. */
+            /* nav, ported: 50px is the grid's last row, and the icons hang
+               from the bottom of it rather than centring — which is why live's
+               home glyph looks like it's resting on the edge of the screen. */
             .rail {
                 top: auto;
                 bottom: 0;
                 left: 0;
                 width: 100%;
-                height: 60px;
-                padding: 0 14px;
+                height: 50px;
+                padding: 0 10px;
                 background: none;
                 display: flex;
-                align-items: center;
+                align-items: flex-end;
                 justify-content: space-between;
             }
 
@@ -512,15 +680,65 @@
                 pointer-events: none;
             }
 
-            /* The live phone bar carries four: home, create set, add cards, and
-               a "more" control that opens the rest. Without that menu the stubs
-               are dead weight in a 375px row. */
-            /* Two classes, so these beat `.rail a` (0,1,1). A bare
+            /* The live phone bar carries four: home, create set, add cards,
+               and a "more" control that opens the rest. Everything hidden here
+               is in that menu — see partials/more-menu — so this is a move,
+               not a cut. Six controls in a 375px row is what it replaces.
+
+               Two classes, so these beat `.rail a` (0,1,1). A bare
                .rail__profile loses to it and the icon stays visible. */
             .rail .rail__stub,
-            .rail .rail__quests,
+            .rail .rail__frSets,
             .rail .rail__profile,
-            .rail .rail__leaderboard { display: none; }
+            .rail .rail__logout { display: none; }
+
+            .more { display: block; }
+
+            /* The edge column, ported from .bottom-nav.
+               ------------------------------------------------------------
+               Live doesn't position these individually: .bottom-nav is a
+               285px-tall fixed grid whose LAST ROW IS THE BAR, with a 17.5%
+               right column, rows 70 / 1fr / 1fr / 50 reading top to bottom.
+               From the bottom that's nav 50, mySets 82.5, quests 82.5,
+               leaderboard 70 — and 50+82.5+82.5 = 215, which is why the
+               trophy clears the 230px crest and the other two ride it. All
+               the offsets I'd been guessing fall out of that one grid.
+
+               Our .rail is a flex bar rather than that grid, so each icon
+               becomes its own fixed box of the same row height, centred in
+               the same 17.5% column. Same geometry, reached differently. */
+            .rail .rail__mySets,
+            .rail .rail__quests,
+            .rail .rail__leaderboard {
+                position: fixed;
+                right: 0;
+                width: 17.5%;
+                display: flex;
+                justify-content: center;   /* justify-self: center */
+                align-items: center;       /* align-self: center */
+            }
+
+            /* The edge rules above are as specific as the stub rule and come
+               after it, so an unrouted one of these three would reappear. All
+               three are routed today; this keeps that from being load-bearing. */
+            .rail span.rail__stub { display: none; }
+
+            .rail .rail__mySets { bottom: 50px;  height: 82.5px; }
+            .rail .rail__quests { bottom: 132.5px; height: 82.5px; }
+
+            /* align-self: flex-start on live, i.e. the top of its 70px row. */
+            .rail .rail__leaderboard {
+                bottom: 215px;
+                height: 70px;
+                align-items: flex-start;
+            }
+
+            /* Fills aren't in what came across — header-comp.css arrived empty
+               — so these stay as measured off the reference: white on the
+               crest for the two that sit on it, gradient for the trophy, which
+               the grid puts above it. */
+            .rail .rail__leaderboard .icon [fill="currentColor"] { fill: url(#chromeGrad); }
+            .rail .rail__leaderboard .icon [fill^="url(#paint"] { fill: var(--paper); }
 
             /* Empty when neither create route is wired — otherwise it still
                takes a flex slot and skews the spacing. */
@@ -550,29 +768,91 @@
            hides, .nav-spice-top shows, and .bottom-nav moves to top: 0. */
         @media (min-width: 450px) and (max-width: 599px),
                (min-width: 450px) and (max-height: 699px) {
-            /* The band's lower edge lands at roughly 40% of the shape height,
-               and the shape is 232/451 of the viewport width — so ~20.6vw.
-               Content starts below that instead of at a fixed offset. */
-            body { padding-top: calc(20.6vw + 18px); padding-bottom: 0; }
+            /* Fixed, now that the shape is. The band's lower edge runs between
+               y=63 and y=94 across the width of a 232-tall viewBox, and the
+               shape no longer grows with the viewport, so there's nothing left
+               to scale against — the vw expression that used to be here just
+               pushed content further down the wider the window got.
 
+               Live starts .content-cont at 67.5px, i.e. tucked under the band
+               rather than below it, because its content scrolls in its own box
+               over the top of the crest. Ours is in normal flow, so it clears
+               the deepest point instead. */
+            body { padding-top: 112px; padding-bottom: 0; }
+
+            /* 60px row here, and the icons hang from the top instead — the bar
+               is docked to the top of the screen in this band. */
             .rail {
                 top: 0;
                 bottom: auto;
+                height: 60px;
+                padding-top: 10px;
+                align-items: flex-start;
             }
 
             .rail__shape--bottom { display: none; }
 
-            /* .nav-spice-top sets width: 100% and no height, so it keeps its
-               451:232 ratio and grows with the viewport — ~251px tall at 489px
-               wide. Forcing a height here is what flattened it. */
+            /* Fixed 232px tall, stretched horizontally — the same shape as
+               .nav-spice at the bottom, and for the same reason.
+
+               An earlier note here had this keeping its 451:232 ratio because
+               .nav-spice-top sets no height in CSS. It doesn't need to: the
+               SVG carries height="232" as an attribute, so only the width is
+               overridden and the height stays put. With preserveAspectRatio
+               ="none" the artwork stretches sideways to fill it, which is the
+               intent — aspect-ratio made it grow downward instead, 308px deep
+               at 599px, which is what was drowning the trophy. */
             .rail__shape--top {
                 display: block;
                 top: 0;
                 bottom: auto;
                 width: 100%;
-                height: auto;
-                aspect-ratio: 451 / 232;
+                height: 232px;
                 pointer-events: none;
+            }
+
+            /* The bar is at the top in this band, so the panel has to fall
+               out of it rather than rise from it — and the reveal has to
+               originate from the top corner to match. */
+            /* .extraIcons at this width: top: 80px, same insets. */
+            .more__panel {
+                bottom: auto;
+                top: 80px;
+                animation-name: more-reveal--top;
+            }
+
+            /* The column follows the bar to the top rather than staying at the
+               bottom of the page, riding the top crest's tail the way it rides
+               the bottom crest below 450px. Same offsets, same white fill,
+               measured from the other edge — the shape is 451:232 and solid
+               down its right side to about 215/232, so 192 + a 34px icon still
+               lands on blue.
+
+               Which also flips the reading order, correctly: the column always
+               starts next to the bar and grows away from it, so your sets is
+               nearest the bar in both bands and the rail's own top-to-bottom
+               order comes out right here. */
+            /* Live's second .bottom-nav: 305px tall from the top, a 12.5%
+               column, rows 60 / 1fr / 1fr / 1fr with the bar first — so three
+               equal 81.67px rows under a 60px bar, and the order reverses
+               because the grid is read downward from the bar instead of upward
+               to it. That's the flip I'd arrived at by eye. */
+            .rail .rail__mySets,
+            .rail .rail__quests,
+            .rail .rail__leaderboard {
+                width: 12.5%;
+                bottom: auto;
+                height: 81.67px;
+            }
+
+            .rail .rail__mySets      { top: 60px; }
+            .rail .rail__quests      { top: 141.67px; }
+
+            /* align-self: flex-end here, the opposite end of its row to the
+               band below — live sets it in both places. */
+            .rail .rail__leaderboard {
+                top: 223.33px;
+                align-items: flex-end;
             }
 
             /* Only the current-page icon needs moving now; the pills sit in
@@ -644,6 +924,32 @@
             ['icon' => 'quests',     'label' => 'Daily quests', 'area' => 'quests',  'route' => 'quests.index'],
             ['icon' => 'profile',    'label' => 'Profile',      'area' => 'profile', 'route' => 'profile.edit'],
         ];
+
+        /*
+         | How the rail divides at phone width, which is three ways rather than
+         | two. The bar takes home and the two create icons. These three stay
+         | out on the page edge as their own column — that's what leaves live's
+         | menu holding only three icons, so it's the reason the strip is the
+         | shape it is, not a coincidence of how many routes exist.
+         |
+         | Whatever is in neither group falls into the menu. Derived rather than
+         | listed again, so a new rail entry lands somewhere by default.
+         |
+         | The edge column's positions are in the stylesheet by area class, so
+         | this list and that block have to agree — see .rail__mySets there.
+         */
+        $edgeAreas = ['mySets', 'quests', 'leaderboard'];
+
+        // Home keeps its own slot in the bar; leaderboard is appended because
+        // it's rendered outside the loop below, off on the rail's bottom blob.
+        $moreItems = array_values(array_filter(
+            array_merge(
+                array_slice($railItems, 1),
+                $railLower,
+                [['icon' => 'leaderboard', 'label' => 'Leaderboard', 'area' => 'leaderboard', 'route' => 'leaderboard.index']],
+            ),
+            fn (array $item) => ! in_array($item['area'], $edgeAreas, true),
+        ));
     @endphp
 
     <nav class="rail" aria-label="Main">
@@ -731,6 +1037,11 @@
                 </button>
             </form>
         @endauth
+
+        {{-- Last child, so it lands at the right end of the phone bar's
+             space-between row — the corner the reveal grows from. Hidden at
+             rail widths, where nothing needs overflowing. --}}
+        @include('partials.more-menu', ['items' => $moreItems])
     </nav>
 
     <svg width="0" height="0" aria-hidden="true" style="position:absolute">
@@ -745,5 +1056,47 @@
     @hasSection('current-icon')
         <div class="chrome">@yield('current-icon')</div>
     @endif
+
+    <script>
+        /*
+            Enhancement only. <details> opens and closes on its own, with the
+            keyboard, before this runs — what's added here is the behaviour a
+            disclosure widget doesn't have but a menu is expected to: dismiss
+            on an outside tap, and on Escape.
+
+            Vanilla to match cards/order, the app's only other script. Alpine
+            is loaded in the head and currently drives nothing; this would be
+            three attributes in Alpine, but reaching for it here would make the
+            layout the first file that needs it.
+        */
+        (() => {
+            const menu = document.getElementById('more-menu');
+
+            if (! menu) return;
+
+            const close = () => { menu.open = false; };
+
+            // Pointerdown rather than click: closing on the press means the
+            // panel is gone before whatever was underneath it reacts.
+            document.addEventListener('pointerdown', (event) => {
+                if (menu.open && ! menu.contains(event.target)) close();
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && menu.open) {
+                    close();
+                    // Focus would otherwise be left on a hidden element.
+                    menu.querySelector('summary')?.focus();
+                }
+            });
+
+            // Safari restores a page from the back-forward cache with the
+            // details still open, over a page you've already navigated away
+            // from and back to.
+            menu.querySelectorAll('a').forEach((link) => {
+                link.addEventListener('click', close);
+            });
+        })();
+    </script>
 </body>
 </html>
