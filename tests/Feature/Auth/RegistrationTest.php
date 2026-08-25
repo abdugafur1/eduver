@@ -4,6 +4,7 @@ namespace Tests\Feature\Auth;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
+use App\Models\User;
 
 class RegistrationTest extends TestCase
 {
@@ -28,5 +29,16 @@ class RegistrationTest extends TestCase
 
         $this->assertAuthenticated();
         $response->assertRedirect(route('sets.index', absolute: false));
+    }
+
+    public function test_the_tombstone_namespace_cannot_be_registered(): void
+    {
+        $this->post('/register', [
+            'name' => 'Squatter',
+            'username' => User::TOMBSTONE_PREFIX.'57',
+            'email' => 'squatter@example.com',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+        ])->assertSessionHasErrors('username');
     }
 }

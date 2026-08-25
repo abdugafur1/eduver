@@ -45,6 +45,12 @@ class RegisteredUserController extends Controller
                 'min:3',
                 'max:30',
                 'alpha_dash:ascii',
+                // The tombstone namespace is reserved. Without this, registering
+                // deleted_user_57 makes user 57's account closure fall back to a random
+                // suffix — the retry in User::tombstoneUsername() is a backstop, not
+                // the guard. Case-insensitive because MySQL's collation is and SQLite's
+                // isn't; without /i the rule is weaker in production than in tests.
+                'not_regex:/^'.preg_quote(User::TOMBSTONE_PREFIX, '/').'/i',
                 'not_in:admin,administrator,root,support,help,api,eduver,official,staff,moderator',
                 'unique:'.User::class.',username',
             ],

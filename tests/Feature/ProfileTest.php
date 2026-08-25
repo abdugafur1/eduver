@@ -66,6 +66,8 @@ class ProfileTest extends TestCase
     public function test_user_can_delete_their_account(): void
     {
         $user = User::factory()->create();
+        $email = $user->email;
+        $id = $user->id;
 
         $response = $this
             ->actingAs($user)
@@ -78,7 +80,13 @@ class ProfileTest extends TestCase
             ->assertRedirect('/');
 
         $this->assertGuest();
-        $this->assertNull($user->fresh());
+
+        $tombstone = User::withTrashed()->find($id);
+
+        $this->assertNotNull($tombstone, 'the row is kept — every FK to it cascades');
+        $this->assertNotNull($tombstone->deleted_at);
+        $this->assertNull(User::find($id));
+        $this->assertNotSame($email, $tombstone->email);
     }
 
     public function test_correct_password_must_be_provided_to_delete_account(): void
@@ -96,6 +104,22 @@ class ProfileTest extends TestCase
             ->assertSessionHasErrorsIn('userDeletion', 'password')
             ->assertRedirect('/profile');
 
-        $this->assertNotNull($user->fresh());
+        $this->assertNull($user->fresh()->deleted_at);
+        $this->assertSame($user->username, $user->fresh()->username);
+    }
+
+    public function test_a_user_cannot_rename_into_the_tombstone_namespace(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->patch('/profile', [
+                'username' => strtoupper(User::TOMBSTONE_PREFIX).'57',
+                'name' => $user->name,
+                'email' => $user->email,
+            ])
+            ->assertSessionHasErrors('username');
+
+        $this->assertNotSame(strtoupper(User::TOMBSTONE_PREFIX).'57', $user->fresh()->username);
     }
 }
