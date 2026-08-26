@@ -35,7 +35,7 @@ class StudySetController extends Controller
         $includeStarter = (bool) ($filters['starter'] ?? false);
 
         $sets = StudySet::query()
-            ->with('user:id,username,name')
+            ->with('author:id,username,name,deleted_at')
             // No withCount('cards') — cards_count is a real column and the alias
             // would shadow it. quiz_sessions_count is a genuine subquery, so it
             // is only paid for when that sort is actually selected. Abandoned
@@ -141,7 +141,7 @@ class StudySetController extends Controller
 
         $sets = $request->user()
             ->savedSets()
-            ->with('user:id,username,name')
+            ->with('author:id,username,name,deleted_at')
             ->search($filters['q'] ?? null)
             ->when(
                 $sort === StudySet::SORT_LIBRARY,
@@ -307,7 +307,7 @@ class StudySetController extends Controller
             return $redirect;
         }
 
-        $studySet->load('user:id,username,name');
+        $studySet->load('author:id,username,name,deleted_at');
 
         // Only the three columns the deck renders. Sending the whole row would
         // put timestamps and the aggregate difficulty counters into the page
@@ -341,7 +341,7 @@ class StudySetController extends Controller
             return $redirect;
         }
 
-        $studySet->load('user:id,username,name')->loadCount([
+        $studySet->load('author:id,username,name,deleted_at')->loadCount([
             'quizSessions as quiz_sessions_count' => fn ($q) => $q->whereNotNull('completed_at'),
         ]);
 

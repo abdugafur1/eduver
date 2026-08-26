@@ -289,7 +289,7 @@
 
     <div class="set-head">
         <p class="eyebrow">
-            {{ $set->slug }} · {{ $set->user?->name ?? 'Unknown author' }}
+            {{ $set->slug }} · {{ $set->author?->name ?? 'Unknown author' }}
             @unless ($set->isPublic()) · {{ $set->visibility }} @endunless
         </p>
 

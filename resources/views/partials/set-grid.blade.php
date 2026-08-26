@@ -197,7 +197,7 @@
                          Laravel 13, and it fails as a swallowed block rather
                          than as a clear error. --}}
                     @if ($showOwner ?? true)
-                        <span class="tile__owner">{{ $set->user?->name ?? 'Unknown' }}</span>
+                        <span class="tile__owner">{{ $set->author?->name ?? 'Unknown' }}</span>
                     @endif
                 </div>
             </a>

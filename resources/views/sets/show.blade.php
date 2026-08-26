@@ -257,7 +257,7 @@
 
         <h1>{{ $set->title }}</h1>
 
-        <p class="byline">{{ $set->user?->name ?? 'Unknown author' }}</p>
+        <p class="byline">{{ $set->author?->name ?? 'Unknown author' }}</p>
 
         @if (filled($set->description))
             <p class="lede">{{ $set->description }}</p>

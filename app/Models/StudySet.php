@@ -117,6 +117,18 @@ class StudySet extends Model
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * The author including tombstones. user() keeps the global scope, so a
+     * closed account resolves to null there — which is what scopeSearch()
+     * wants, since orWhereHas('user') would otherwise make "deleted" match
+     * every orphaned set. Views bind here instead: closeAccount() writes
+     * 'Deleted user' into name precisely so it can be shown.
+     */
+    public function author(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id')->withTrashed();
+    }
+
     public function cards(): HasMany
     {
         return $this->hasMany(Card::class);
