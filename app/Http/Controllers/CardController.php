@@ -94,14 +94,22 @@ class CardController extends Controller
             // returns null, so a first card lands at position 0.
             $position = (int) ($studySet->cards()->max('position') ?? -1);
 
-            foreach ($validated['cards'] as $row) {
-                $studySet->cards()->create([
-                    'term' => $row['term'],
-                    'definition' => $row['definition'],
-                    'hint' => $row['hint'] === '' ? null : $row['hint'],
-                    'position' => ++$position,
-                ]);
-            }
+            // Card's created hook recounts the set, so a 50-row submission
+            // recomputes cards_count fifty times and throws away the first
+            // forty-nine. Suppressed here and reconciled once below. Safe because
+            // booted() registers created and deleted only, and this loop creates.
+            Card::withoutEvents(function () use ($studySet, $validated, &$position) {
+                foreach ($validated['cards'] as $row) {
+                    $studySet->cards()->create([
+                        'term' => $row['term'],
+                        'definition' => $row['definition'],
+                        'hint' => $row['hint'] === '' ? null : $row['hint'],
+                        'position' => ++$position,
+                    ]);
+                }
+            });
+
+            $studySet->recountCards();
         });
 
         $added = count($validated['cards']);
