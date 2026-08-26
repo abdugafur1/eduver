@@ -875,10 +875,13 @@
 
     @stack('styles')
 
-    {{-- Alpine from the CDN: no build step, and it survives you wiring Vite
-         later. defer matters — Alpine has to initialise after the DOM it
-         binds to exists. --}}
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    {{-- Alpine from the bundle, not the CDN: pinned to package.json rather
+         than floating on 3.x.x, and no third-party request per page load.
+         @vite emits type="module", which defers — so the alpine:init
+         listeners pushed by sets.show are registered before Alpine.start()
+         runs. Only the JS: resources/css/app.css is Breeze's Tailwind entry
+         and its Preflight reset would flatten the stylesheet above. --}}
+    @vite(['resources/js/app.js'])
     @stack('scripts')
 </head>
 <body>
