@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -239,14 +238,6 @@ class User extends Authenticatable
                 ->where('quiz_sessions.user_id', '!=', $id));
     }
 
-    /** The sets that survive, for anything that needs to report on them. */
-    public function retainedSets(): Collection
-    {
-        return StudySet::withTrashed()
-            ->where('user_id', $this->getKey())
-            ->whereKeyNot($this->disposableSets()->pluck('id')->all() ?: [0])
-            ->get();
-    }
 
     /**
      * Close this account: destroy what only this user has, overwrite the PII,
