@@ -398,8 +398,27 @@ class AccountDeletionTest extends TestCase
 
         // Blow up on the sessions delete — after the sets have been destroyed
         // and the pivot detached, before the row is overwritten.
-        DB::listen(function ($query) {
-            if (str_contains($query->sql, 'delete from "sessions"')) {
+        //
+        // The table name comes from the grammar rather than being written out:
+        // sqlite wraps in double quotes and MySQL in backticks, so a literal
+        // stops matching the moment this runs on the real driver. It also picks
+        // up a table prefix, should one ever be configured.
+        //
+        // $tripped is not belt-and-braces. If the matcher misses, closeAccount()
+        // runs to completion and the force-delete assertion below fails with
+        // "the transaction should have rolled back" — pointing at the rollback
+        // when the fault is that nothing was ever thrown.
+        //
+        // Note this listener fires from logQuery(), i.e. after the delete has
+        // executed. What's proven here is that the surrounding transaction
+        // undoes it, not that it was prevented.
+        $sessions = DB::connection()->getQueryGrammar()->wrapTable('sessions');
+        $tripped = false;
+
+        DB::listen(function ($query) use ($sessions, &$tripped) {
+            if (str_contains($query->sql, 'delete from '.$sessions)) {
+                $tripped = true;
+
                 throw new RuntimeException('simulated failure');
             }
         });
@@ -409,6 +428,8 @@ class AccountDeletionTest extends TestCase
         } catch (RuntimeException) {
             // The exception is not the assertion; the state afterwards is.
         }
+
+        $this->assertTrue($tripped, 'the simulated failure never fired — the matcher missed');
 
         $this->assertNotNull(
             StudySet::withTrashed()->find($sets['private']->id),
